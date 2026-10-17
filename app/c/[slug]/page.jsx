@@ -1,154 +1,203 @@
-import { createClient } from "@supabase/supabase-js";
-import { buildItemLink } from "../../../lib/affiliate";
+// ============================================================
+// 商品まとめ(公開ページ)v21 /c/{slug}
+//   テンプレート:ranking(TOP N)/ lineup(横並びN選)/ compare(比較リスト)
+//   価格は「今の3サイト価格」を必ず並べ、作成時の価格も小さく添える
+//   リンクはすべて運営のアフィリエイトID
+// ============================================================
 
-export const revalidate = 300;
+import { notFound } from "next/navigation";
+import { COLLECTIONS_ON } from "../../../lib/featureFlags";
+import { loadCollection } from "../../../lib/collectionData";
+import { STORE_ORDER, STORE_META, yen, fmtTime, productPath, statsFor, statsLabel } from "../../../lib/priceView";
+import { PAIN_BY_KEY } from "../../../lib/pains";
+import { SITE } from "../../../lib/supabaseServer";
 
-// 運営の既定アフィリエイト設定(作成者が自分のIDを登録していない場合に使う)
-const FALLBACK_AFF = {
-  rakuten_affiliate_id: process.env.NEXT_PUBLIC_RAKUTEN_AFFILIATE_ID || null,
-  vc_sid: process.env.VC_SID || null,
-  vc_pid: process.env.VC_PID || null,
-  amazon_tag: process.env.AMAZON_TAG || "popo-kaiteki-22",
-};
-
-function db() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SECRET_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+export const revalidate = 600;
+export const dynamicParams = true;
+export async function generateStaticParams() {
+  return [];
 }
 
-async function loadCollection(slug) {
-  const sb = db();
-  const { data: col } = await sb
-    .from("collections")
-    .select("id, slug, title, description, is_public, created_at")
-    .eq("slug", slug)
-    .maybeSingle();
-  if (!col || !col.is_public) return null;
-  const { data: items } = await sb
-    .from("collection_items")
-    .select("position, product_key, name, image, price, store, url, comment")
-    .eq("collection_id", col.id)
-    .order("position");
-  // 作成者のアフィリエイト設定(未登録なら運営のIDにフォールバック)
-  let aff = null;
-  try {
-    const { data } = await sb.rpc("collection_affiliate", { _slug: slug });
-    aff = Array.isArray(data) ? data[0] : data;
-  } catch {}
-  return { col, items: items || [], aff };
-}
+const KICKER = { ranking: (n) => `TOP${n}`, lineup: (n) => `${n}選`, compare: () => "比較" };
 
 export async function generateMetadata({ params }) {
+  if (!COLLECTIONS_ON) return { title: "準備中 | オウダン" };
   const { slug } = await params;
-  const data = await loadCollection(slug);
-  if (!data) return { title: "見つかりません | オウダン" };
+  const d = await loadCollection(slug).catch(() => null);
+  if (!d) return { title: "見つかりません | オウダン" };
+  const n = d.items.length;
+  const title = `${d.col.title}【${KICKER[d.col.template]?.(n) || ""}】| オウダン`;
+  const description = d.col.subtitle || d.col.description || `楽天・Yahoo!・Amazonの価格を比べた商品まとめ(${n}商品)`;
   return {
-    title: `${data.col.title} | オウダン`,
-    description: data.col.description || "オウダンで作った商品まとめ",
-    openGraph: {
-      title: data.col.title,
-      description: data.col.description || "オウダンで作った商品まとめ",
-      images: data.items.filter((i) => i.image).slice(0, 4).map((i) => ({ url: i.image })),
-    },
+    title,
+    description,
+    alternates: { canonical: `/c/${d.col.slug}` },
+    openGraph: { title: d.col.title, description, url: `${SITE}/c/${d.col.slug}`, siteName: "オウダン", type: "article" },
+    twitter: { card: "summary_large_image", title: d.col.title, description },
   };
 }
 
-const yen = (n) => "¥" + Math.round(Number(n)).toLocaleString("ja-JP");
-const STORE_LABEL = { rakuten: "楽天", yahoo: "Yahoo!", amazon: "Amazon" };
-const STORE_COLOR = { rakuten: "#BF0000", yahoo: "#FF0033", amazon: "#232F3E" };
+function cheapest(offers) {
+  let b = null;
+  for (const s of STORE_ORDER) if (offers[s] && (!b || offers[s].price < offers[b].price)) b = s;
+  return b;
+}
+
+function PriceTable({ it }) {
+  const best = cheapest(it.offers);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+      {STORE_ORDER.map((s) => {
+        const o = it.offers[s];
+        const meta = STORE_META[s];
+        const on = s === best;
+        const snap = it.snap?.[s];
+        const lab = o ? statsLabel(statsFor(o.price, o)) : null;
+        return (
+          <div key={s} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: on ? `1.5px solid ${meta.color}` : "1px solid #E2E8F0", background: on ? "#F0FDF6" : "#fff" }}>
+            <div style={{ width: 58, fontSize: 12, fontWeight: 800, color: meta.color }}>
+              {meta.short}
+              {on && <div style={{ fontSize: 9.5, color: "#fff", background: meta.color, borderRadius: 3, padding: "0 4px", display: "inline-block" }}>最安</div>}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: o ? "#16324F" : "#CBD5E1" }}>{o ? yen(o.price) : "未取得"}</div>
+              <div style={{ fontSize: 10, color: "#64748B" }}>
+                {snap != null && o && snap !== o.price ? `作成時 ${yen(snap)} ・ ` : ""}
+                {o?.updated_at ? `${fmtTime(o.updated_at)}時点` : ""}
+                {lab && lab.tone === "good" ? ` ・ ${lab.main}` : ""}
+              </div>
+            </div>
+            {o?.url ? (
+              <a href={o.url} target="_blank" rel="noopener noreferrer sponsored" style={{ fontSize: 11.5, fontWeight: 800, color: "#fff", background: meta.color, borderRadius: 8, padding: "8px 10px", textDecoration: "none", whiteSpace: "nowrap" }}>
+                {meta.short}で見る
+              </a>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ItemCard({ it, i, template }) {
+  const medal = ["#E3A008", "#9CA3AF", "#B7791F"];
+  const tags = (it.tags || []).map((t) => PAIN_BY_KEY[t]).filter(Boolean).slice(0, 2);
+  return (
+    <article style={{ background: "#fff", border: "1px solid #DDE9E4", borderRadius: 16, padding: 16, marginBottom: 14 }}>
+      <div style={{ display: "flex", gap: 14 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          {template === "ranking" ? (
+            <div style={{ minWidth: 52, textAlign: "center", fontSize: 16, fontWeight: 900, color: "#fff", background: medal[i] || "#16324F", borderRadius: 999, padding: "3px 10px" }}>{i + 1}位</div>
+          ) : (
+            <div style={{ minWidth: 30, textAlign: "center", fontSize: 14, fontWeight: 900, color: "#fff", background: "#16324F", borderRadius: 999, padding: "2px 8px" }}>{i + 1}</div>
+          )}
+          {it.image ? <img src={it.image} alt="" style={{ width: 110, height: 110, objectFit: "contain", borderRadius: 12, background: "#F3F6F4" }} /> : <div style={{ width: 110, height: 110, borderRadius: 12, background: "#F3F6F4" }} />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {it.brand && <div style={{ fontSize: 11, fontWeight: 800, color: "#64748B" }}>{it.brand}</div>}
+          <h2 style={{ fontSize: 15, fontWeight: 800, lineHeight: 1.45, margin: "2px 0 0" }}>
+            <a href={productPath(it.pkey)} style={{ color: "#16324F", textDecoration: "none" }}>{it.name}</a>
+          </h2>
+          {it.headline && <div style={{ fontSize: 13, fontWeight: 800, color: "#B45309", marginTop: 6 }}>{it.headline}</div>}
+          {tags.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+              {tags.map((t) => <span key={t.key} style={{ fontSize: 10.5, fontWeight: 700, color: "#065F46", background: "#ECFDF5", borderRadius: 999, padding: "2px 8px" }}>✅ {t.label}</span>)}
+            </div>
+          )}
+        </div>
+      </div>
+      {it.comment && <p style={{ fontSize: 13, color: "#334155", lineHeight: 1.75, margin: "12px 0 0", whiteSpace: "pre-wrap" }}>{it.comment}</p>}
+      <PriceTable it={it} />
+      <a href={productPath(it.pkey)} style={{ display: "inline-block", marginTop: 8, fontSize: 11.5, fontWeight: 700, color: "#2563EB", textDecoration: "none" }}>この商品の価格の動き(中央値・3か月で何番目)を見る →</a>
+    </article>
+  );
+}
+
+function CompareTable({ items }) {
+  return (
+    <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #DDE9E4", borderRadius: 14, marginBottom: 16 }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 520, fontSize: 12.5 }}>
+        <thead>
+          <tr style={{ background: "#F3F6F4" }}>
+            <th style={{ textAlign: "left", padding: "10px 12px" }}>商品</th>
+            {STORE_ORDER.map((s) => <th key={s} style={{ textAlign: "right", padding: "10px 12px", color: STORE_META[s].color, whiteSpace: "nowrap" }}>{STORE_META[s].short}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it, i) => {
+            const best = cheapest(it.offers);
+            return (
+              <tr key={i} style={{ borderTop: "1px solid #E2E8F0" }}>
+                <td style={{ padding: "10px 12px" }}>
+                  <a href={productPath(it.pkey)} style={{ color: "#16324F", fontWeight: 700, textDecoration: "none" }}>{it.name.slice(0, 40)}</a>
+                </td>
+                {STORE_ORDER.map((s) => {
+                  const o = it.offers[s];
+                  return (
+                    <td key={s} style={{ padding: "10px 12px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {o ? (
+                        <a href={o.url} target="_blank" rel="noopener noreferrer sponsored" style={{ fontWeight: 800, color: s === best ? "#059669" : "#16324F", background: s === best ? "#ECFDF5" : "transparent", borderRadius: 6, padding: "2px 6px", textDecoration: "none" }}>
+                          {yen(o.price)}{s === best ? " 最安" : ""}
+                        </a>
+                      ) : <span style={{ color: "#CBD5E1" }}>—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default async function CollectionPage({ params }) {
-  const { slug } = await params;
-  const data = await loadCollection(slug);
-
-  if (!data) {
-    return (
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: 40, textAlign: "center" }}>
-        <h1 style={{ fontSize: 18 }}>このまとめは見つかりませんでした</h1>
-        <p style={{ fontSize: 13, color: "#64748B" }}>削除されたか、非公開に設定されています。</p>
-        <a href="/" style={{ fontSize: 13, fontWeight: 700, color: "#16324F" }}>← オウダンで商品を探す</a>
-      </div>
-    );
+  if (!COLLECTIONS_ON) {
+    return <div style={{ padding: 40, textAlign: "center", fontFamily: "sans-serif" }}>この機能は準備中です。</div>;
   }
-
-  const { col, items, aff } = data;
-  // 3列グリッド。9枚なら3×3になる
-  const cols = items.length <= 4 ? 2 : 3;
+  const { slug } = await params;
+  const d = await loadCollection(slug).catch(() => null);
+  if (!d) notFound();
+  const { col, items } = d;
+  const tpl = col.template || "ranking";
+  const n = items.length;
+  const shareText = encodeURIComponent(`${col.title}\n${SITE}/c/${col.slug}\n#PR`);
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", padding: "20px 14px 50px" }}>
-      <header style={{ marginBottom: 16 }}>
-        <a href="/" style={{ fontSize: 12, fontWeight: 800, color: "#16324F", textDecoration: "none" }}>
-          オウダン <span style={{ fontWeight: 400, color: "#64748B" }}>実質価格で比べる横断検索</span>
-        </a>
-        <h1 style={{ fontSize: 20, fontWeight: 800, margin: "10px 0 4px", lineHeight: 1.4 }}>{col.title}</h1>
-        {col.description && (
-          <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.7, margin: 0 }}>{col.description}</p>
-        )}
+    <div style={{ minHeight: "100vh", background: "#F0F6F4", fontFamily: "'Hiragino Sans','Noto Sans JP',-apple-system,sans-serif", color: "#16324F" }}>
+      <header style={{ background: "#16324F", padding: "12px 16px" }}>
+        <div className="oud-wrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <a href="/" style={{ color: "#fff", fontWeight: 800, fontSize: 17, textDecoration: "none" }}>オウダン</a>
+          <a href="/c" style={{ color: "#CBD5E1", fontSize: 12, textDecoration: "none" }}>まとめ一覧</a>
+        </div>
       </header>
+      <main className="oud-wrap" style={{ padding: "16px 16px 40px" }}>
+        <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", background: "#E3A008", display: "inline-block", borderRadius: 6, padding: "2px 10px" }}>{KICKER[tpl]?.(n)}</div>
+        <h1 style={{ fontSize: 22, fontWeight: 900, lineHeight: 1.4, margin: "8px 0 4px" }}>{col.title}</h1>
+        {col.subtitle && <p style={{ fontSize: 13.5, color: "#334155", margin: "0 0 6px", lineHeight: 1.6 }}>{col.subtitle}</p>}
+        <div style={{ fontSize: 11, color: "#64748B" }}>
+          作成:{col.author_name || "オウダン編集部"} ・ {fmtTime(col.updated_at || col.created_at).split(" ")[0]}更新 ・ 【PR】
+        </div>
+        {col.description && <p style={{ fontSize: 13.5, color: "#334155", lineHeight: 1.8, whiteSpace: "pre-wrap", margin: "14px 0" }}>{col.description}</p>}
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 8 }}>
-        {items.map((it, i) => {
-          const href = buildItemLink(it, aff, FALLBACK_AFF);
-          return (
-            <a
-              key={i}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-              style={{
-                display: "block", textDecoration: "none", color: "inherit",
-                background: "#fff", border: "1px solid #DDE9E4", borderRadius: 12, overflow: "hidden",
-              }}
-            >
-              <div style={{ position: "relative", width: "100%", aspectRatio: "1 / 1", background: "#EAF3F0" }}>
-                {it.image ? (
-                  <img src={it.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                ) : (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", fontSize: 11, color: "#94A3B8" }}>画像なし</div>
-                )}
-                {it.store && (
-                  <span style={{
-                    position: "absolute", left: 6, top: 6, fontSize: 9, fontWeight: 800, color: "#fff",
-                    background: STORE_COLOR[it.store] || "#64748B", borderRadius: 4, padding: "2px 6px",
-                  }}>{STORE_LABEL[it.store] || it.store}</span>
-                )}
-              </div>
-              <div style={{ padding: "7px 8px 9px" }}>
-                <div style={{
-                  fontSize: 11, fontWeight: 600, lineHeight: 1.4, height: "2.8em", overflow: "hidden",
-                  display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                }}>{it.name}</div>
-                {it.price ? (
-                  <div style={{ fontSize: 12.5, fontWeight: 800, marginTop: 3 }}>{yen(it.price)}</div>
-                ) : null}
-                {it.comment && (
-                  <div style={{ fontSize: 10.5, color: "#64748B", marginTop: 3, lineHeight: 1.5 }}>{it.comment}</div>
-                )}
-              </div>
-            </a>
-          );
-        })}
-      </div>
+        {tpl === "compare" && <CompareTable items={items} />}
 
-      <div style={{ marginTop: 20, textAlign: "center" }}>
-        <a href="/" style={{
-          display: "inline-block", fontSize: 13, fontWeight: 800, color: "#fff", background: "#10B981",
-          borderRadius: 10, padding: "11px 22px", textDecoration: "none",
-        }}>
-          オウダンで最安値を比べる →
-        </a>
-      </div>
+        <div style={{ marginTop: 14 }} className={tpl === "lineup" ? "oud-grid" : undefined}>
+          {items.map((it, i) => <ItemCard key={i} it={it} i={i} template={tpl} />)}
+        </div>
 
-      <p style={{ fontSize: 10, color: "#94A3B8", marginTop: 20, lineHeight: 1.7, textAlign: "center" }}>
-        【PR】このページのリンクにはアフィリエイトリンクが含まれます。価格は保存時点のもので、現在の価格と異なる場合があります。
-        最新の価格・送料・在庫は各ストアでご確認ください。
-      </p>
-      <p style={{ textAlign: "center", marginTop: 10 }}>
-        <a href="/privacy" style={{ fontSize: 11, color: "#64748B" }}>プライバシーポリシー</a>
-      </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+          <a href={`https://x.com/intent/post?text=${shareText}`} target="_blank" rel="noopener noreferrer" style={{ background: "#000", color: "#fff", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 800, textDecoration: "none" }}>Xでシェア</a>
+          <a href="/" style={{ background: "#fff", color: "#16324F", border: "1.5px solid #16324F", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 800, textDecoration: "none" }}>オウダンで他の商品を比べる</a>
+        </div>
+
+        <p style={{ fontSize: 10.5, color: "#94A3B8", lineHeight: 1.7, marginTop: 18 }}>
+          【PR】このページの購入リンクはアフィリエイトリンクです(楽天アフィリエイト・バリューコマース・Amazonアソシエイト)。
+          Amazonのアソシエイトとして、オウダンは適格販売により収入を得ています。
+          価格は各時点のもので変わることがあります。購入前に各サイトでご確認ください。
+        </p>
+      </main>
     </div>
   );
 }

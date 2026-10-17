@@ -1,0 +1,59 @@
+# オウダン 自動取得(1日4回)
+#   午前5時ごろ・午後5時ごろ(JST):ランキング・ブランド・補完
+#   午前11時ごろ・午後11時ごろ(JST):他サイトで探す「補完」だけ(v24・各25分)
+#   GitHub の混雑で数分〜数十分遅れることがあります。
+#   手動で動かすとき:Actions → collect → Run workflow
+name: collect
+
+on:
+  schedule:
+    - cron: "7 20 * * *"   # 05:07 JST(UTC 20:07)
+    - cron: "7 8 * * *"    # 17:07 JST(UTC 08:07)
+    - cron: "7 2 * * *"    # 11:07 JST(UTC 02:07)補完だけ
+    - cron: "7 14 * * *"   # 23:07 JST(UTC 14:07)補完だけ
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: "am(ランキング全部)/ pm(上位だけ)/ fill(補完だけ)/ 空欄=時刻で自動"
+        required: false
+        default: ""
+      minutes:
+        description: "最大の実行時間(分)。空欄=午前33分・午後20分・補完25分"
+        required: false
+        default: ""
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            collector
+            lib
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: 3サイトから取得してDBに保存
+        run: npx --yes tsx@4.19.2 collector/run.js
+        env:
+          SLOT: ${{ (github.event.schedule == '7 2 * * *' || github.event.schedule == '7 14 * * *') && 'fill' || github.event.inputs.slot }}
+          RUN_MINUTES: ${{ github.event.inputs.minutes }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          RAKUTEN_APP_ID: ${{ secrets.RAKUTEN_APP_ID }}
+          RAKUTEN_ACCESS_KEY: ${{ secrets.RAKUTEN_ACCESS_KEY }}
+          RAKUTEN_AFFILIATE_ID: ${{ secrets.RAKUTEN_AFFILIATE_ID }}
+          SITE_ORIGIN: https://oudan.vercel.app
+          YAHOO_CLIENT_ID: ${{ secrets.YAHOO_CLIENT_ID }}
+          VC_SID: ${{ secrets.VC_SID }}
+          VC_PID: ${{ secrets.VC_PID }}
+          AMAZON_CLIENT_ID: ${{ secrets.AMAZON_CLIENT_ID }}
+          AMAZON_CLIENT_SECRET: ${{ secrets.AMAZON_CLIENT_SECRET }}
+          AMAZON_CREDENTIAL_VERSION: "3.3"
+          AMAZON_PARTNER_TAG: popo-kaiteki-22

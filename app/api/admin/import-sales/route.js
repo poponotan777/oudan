@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { adminOk } from "../../../../lib/adminAuth";
 
 // Googleスプレッドシートからセール情報を取り込む
 // シート列(1行目ヘッダー):
@@ -77,8 +78,8 @@ function extractDates(period) {
 export async function POST(request) {
   try {
     const { key, sheetUrl } = await request.json();
-    const required = process.env.NEXT_PUBLIC_CRAWL_KEY || "";
-    if (required && key !== required) {
+    // v23: 合言葉はサーバー専用の ADMIN_KEY で確認(未設定なら旧 NEXT_PUBLIC_CRAWL_KEY)
+    if (!adminOk(key)) {
       return NextResponse.json({ error: "合言葉が違います" }, { status: 403 });
     }
     const urls = toCsvUrls(sheetUrl || "");

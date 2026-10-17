@@ -1,322 +1,304 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+// ============================================================
+// 商品まとめの作成(運営専用)v21 /collections
+//   ・合言葉(Vercel の ADMIN_KEY)を入れた人だけが作成・編集・削除できる
+//   ・テンプレート3種:TOP N(順位つき)/ 横並び N選 / 比較リスト
+//   ・商品は2〜6個。自動取得のDB(3サイトの価格)から選ぶ
+//   ・保存すると共有URLとOGP画像(1200×630)が自動でできる
+// ============================================================
+
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { makeSlug } from "../../lib/affiliate";
+import { loadCatalog } from "../../lib/catalog";
+import { STORE_ORDER, STORE_META, yen } from "../../lib/priceView";
+import { COLLECTIONS_ON } from "../../lib/featureFlags";
 
-const yen = (n) => "¥" + Math.round(Number(n)).toLocaleString("ja-JP");
-const STORE_LABEL = { rakuten: "楽天", yahoo: "Yahoo!", amazon: "Amazon" };
-const STORE_COLOR = { rakuten: "#BF0000", yahoo: "#FF0033", amazon: "#232F3E" };
-const MAX_ITEMS = 12;
+const TEMPLATES = [
+  { id: "ranking", label: "TOP N(順位つき)", desc: "1位・2位…とメダル付きで並べる。おすすめ順を伝えたいとき" },
+  { id: "lineup", label: "横並び N選", desc: "順位なしで並べる。「◯◯なら この3つ」系" },
+  { id: "compare", label: "比較リスト", desc: "3サイトの価格を表で比べる。どこが安いかを見せたいとき" },
+];
 
-const card = { background: "#fff", border: "1px solid #DDE9E4", borderRadius: 14, padding: 16 };
-const btn = { border: "none", borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 800, cursor: "pointer" };
+const box = { background: "#fff", border: "1px solid #DDE9E4", borderRadius: 14, padding: 16, marginBottom: 14 };
+const input = { width: "100%", boxSizing: "border-box", border: "1px solid #CBD5E1", borderRadius: 8, padding: "9px 12px", fontSize: 16, outline: "none" };
+const btn = (bg = "#16324F", color = "#fff") => ({ background: bg, color, border: bg === "#fff" ? "1.5px solid #16324F" : "none", borderRadius: 8, padding: "9px 14px", fontSize: 13, fontWeight: 800, cursor: "pointer" });
 
-export default function CollectionsPage() {
-  const [user, setUser] = useState(null);
-  const [collections, setCollections] = useState([]);
-  const [editing, setEditing] = useState(null); // {id, slug, title, description, is_public}
+const EMPTY = { id: null, slug: null, title: "", subtitle: "", description: "", author_name: "", template: "ranking", is_public: true };
+
+function pricesOf(entry) {
+  const p = {};
+  for (const s of STORE_ORDER) p[s] = entry?.offers?.[s]?.price ?? null;
+  return p;
+}
+
+function Mini({ prices }) {
+  let best = null;
+  for (const s of STORE_ORDER) if (prices?.[s] != null && (best == null || prices[s] < prices[best])) best = s;
+  return (
+    <div style={{ display: "flex", gap: 6, fontSize: 11, marginTop: 3, flexWrap: "wrap" }}>
+      {STORE_ORDER.map((s) => (
+        <span key={s} style={{ color: STORE_META[s].color, fontWeight: 800, background: s === best ? "#ECFDF5" : "transparent", borderRadius: 4, padding: "0 4px" }}>
+          {STORE_META[s].short} <span style={{ color: prices?.[s] == null ? "#CBD5E1" : "#16324F" }}>{yen(prices?.[s])}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+export default function CollectionsAdmin() {
+  const [key, setKey] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [list, setList] = useState([]);
+  const [col, setCol] = useState(null);
   const [items, setItems] = useState([]);
-  const [candidates, setCandidates] = useState([]);
+  const [q, setQ] = useState("");
+  const [found, setFound] = useState([]);
+  const [searching, setSearching] = useState(false);
   const [msg, setMsg] = useState("");
+  const [preview, setPreview] = useState("");
+  const [saved, setSaved] = useState(null);
   const [busy, setBusy] = useState(false);
-  // 自分のアフィリエイトID(登録すると自分のまとめが自分の成果になる)
-  const [aff, setAff] = useState({ rakuten_affiliate_id: "", vc_sid: "", vc_pid: "", amazon_tag: "" });
-  const [affMsg, setAffMsg] = useState("");
+
+  const api = async (action, extra = {}) => {
+    const res = await fetch("/api/admin/collections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, action, ...extra }) });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    return j;
+  };
+
+  const login = async (k = key) => {
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin/collections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: k, action: "list" }) });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || "ログインできません");
+      setList(j.collections || []);
+      setAuthed(true);
+      try { sessionStorage.setItem("oudanAdminKey", k); } catch {}
+    } catch (e) { setMsg(String(e.message || e)); }
+  };
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+    try { const k = sessionStorage.getItem("oudanAdminKey"); if (k) { setKey(k); login(k); } } catch {}
   }, []);
 
-  const loadCollections = useCallback(() => {
-    if (!user) return;
-    supabase.from("collections").select("id, slug, title, description, is_public, created_at")
-      .eq("user_id", user.id).order("created_at", { ascending: false })
-      .then(({ data }) => setCollections(data || []));
-  }, [user]);
+  const refresh = async () => { try { setList((await api("list")).collections || []); } catch (e) { setMsg(e.message); } };
 
-  useEffect(() => { loadCollections(); }, [loadCollections]);
-
-  // 素材: お気に入りリスト + 最近見た商品(localStorage)
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const { data: wl } = await supabase.from("wishlists").select("jan, name, image").limit(60);
-      let vh = [];
-      try { vh = JSON.parse(localStorage.getItem("viewHistory") || "[]"); } catch {}
-      const seen = new Set();
-      const list = [];
-      for (const w of wl || []) {
-        if (seen.has(w.jan)) continue;
-        seen.add(w.jan);
-        list.push({ product_key: w.jan, name: w.name, image: w.image, price: null, store: null, url: null, from: "リスト" });
-      }
-      for (const v of vh) {
-        if (!v.key || seen.has(v.key)) continue;
-        seen.add(v.key);
-        list.push({ product_key: v.key, name: v.name, image: v.image, price: v.price || null, store: v.store || null, url: null, from: "最近見た" });
-      }
-      setCandidates(list);
-    })();
-  }, [user]);
-
-  // 自分のアフィリID読み込み
-  useEffect(() => {
-    if (!user) return;
-    supabase.from("profiles_affiliate").select("*").eq("user_id", user.id).maybeSingle()
-      .then(({ data }) => { if (data) setAff({
-        rakuten_affiliate_id: data.rakuten_affiliate_id || "",
-        vc_sid: data.vc_sid || "", vc_pid: data.vc_pid || "", amazon_tag: data.amazon_tag || "",
-      }); });
-  }, [user]);
-
-  const saveAff = async () => {
-    if (!user) return;
-    const { error } = await supabase.from("profiles_affiliate").upsert(
-      { user_id: user.id, ...aff, updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
-    setAffMsg(error ? "保存に失敗しました: " + error.message : "保存しました。あなたのまとめのリンクがあなたのIDに切り替わります");
+  const startNew = () => { setCol({ ...EMPTY }); setItems([]); setPreview(""); setSaved(null); setMsg(""); };
+  const edit = async (c) => {
+    try {
+      const j = await api("get", { id: c.id });
+      setCol({ ...EMPTY, ...j.collection });
+      const keys = (j.items || []).map((i) => i.product_key);
+      const cat = await loadCatalog(supabase, keys).catch(() => new Map());
+      setItems((j.items || []).map((i) => ({ product_key: i.product_key, name: i.name, image: i.image, headline: i.headline || "", comment: i.comment || "", prices: pricesOf(cat.get(i.product_key)) })));
+      setPreview(""); setSaved(null); setMsg("");
+      window.scrollTo(0, 0);
+    } catch (e) { setMsg(e.message); }
+  };
+  const remove = async (c) => {
+    if (!window.confirm(`「${c.title}」を削除します。よろしいですか?`)) return;
+    try { await api("delete", { id: c.id }); refresh(); if (col?.id === c.id) setCol(null); } catch (e) { setMsg(e.message); }
   };
 
-  const newCollection = () => {
-    setEditing({ id: null, slug: makeSlug(), title: "", description: "", is_public: true });
-    setItems([]);
+  // DB(3サイトの価格)から商品を探す
+  const search = async () => {
+    const kw = q.trim();
+    if (!kw) return;
+    setSearching(true);
+    try {
+      const words = kw.split(/\s+/).filter(Boolean).slice(0, 4);
+      let query = supabase.from("products").select("pkey, name, image, brand, pop").is("merged_into", null);
+      for (const w of words) query = query.ilike("name", `%${w}%`);
+      const { data } = await query.order("pop", { ascending: true, nullsFirst: false }).limit(30);
+      const cat = await loadCatalog(supabase, (data || []).map((p) => p.pkey)).catch(() => new Map());
+      setFound((data || []).map((p) => ({ ...p, prices: pricesOf(cat.get(p.pkey)), stores: Object.keys(cat.get(p.pkey)?.offers || {}).length })));
+    } catch { setFound([]); }
+    setSearching(false);
+  };
+
+  const add = (p) => {
+    if (items.length >= 6) return setMsg("商品は6個までです");
+    if (items.some((i) => i.product_key === p.pkey)) return;
+    setItems([...items, { product_key: p.pkey, name: p.name, image: p.image, headline: "", comment: "", prices: p.prices }]);
     setMsg("");
   };
-
-  const openCollection = async (c) => {
-    setEditing(c);
-    setMsg("");
-    const { data } = await supabase.from("collection_items")
-      .select("position, product_key, name, image, price, store, url, comment")
-      .eq("collection_id", c.id).order("position");
-    setItems(data || []);
-  };
-
-  const addItem = (cand) => {
-    if (items.length >= MAX_ITEMS) { setMsg(`商品は最大${MAX_ITEMS}件までです`); return; }
-    if (items.some((i) => i.product_key === cand.product_key)) return;
-    setItems([...items, { ...cand, comment: "" }]);
-    setMsg("");
-  };
-
-  const move = (idx, dir) => {
+  const move = (i, d) => {
+    const j = i + d;
+    if (j < 0 || j >= items.length) return;
     const next = [...items];
-    const j = idx + dir;
-    if (j < 0 || j >= next.length) return;
-    [next[idx], next[j]] = [next[j], next[idx]];
+    [next[i], next[j]] = [next[j], next[i]];
     setItems(next);
   };
+  const setItem = (i, k, v) => setItems(items.map((it, x) => (x === i ? { ...it, [k]: v } : it)));
 
-  const save = async () => {
-    if (!user) return;
-    if (!editing.title.trim()) { setMsg("タイトルを入力してください"); return; }
-    if (items.length === 0) { setMsg("商品を1つ以上追加してください"); return; }
+  const doPreview = async () => {
     setBusy(true);
     try {
-      let cid = editing.id;
-      if (cid) {
-        await supabase.from("collections").update({
-          title: editing.title.trim(), description: editing.description?.trim() || null,
-          is_public: editing.is_public, updated_at: new Date().toISOString(),
-        }).eq("id", cid);
-        await supabase.from("collection_items").delete().eq("collection_id", cid);
-      } else {
-        const { data, error } = await supabase.from("collections").insert({
-          user_id: user.id, slug: editing.slug, title: editing.title.trim(),
-          description: editing.description?.trim() || null, is_public: editing.is_public,
-        }).select("id").single();
-        if (error) throw error;
-        cid = data.id;
-        setEditing({ ...editing, id: cid });
-      }
-      const rows = items.map((it, i) => ({
-        collection_id: cid, position: i, product_key: it.product_key, name: it.name,
-        image: it.image || null, price: it.price || null, store: it.store || null,
-        url: it.url || null, comment: it.comment?.trim() || null,
-      }));
-      const { error: e2 } = await supabase.from("collection_items").insert(rows);
-      if (e2) throw e2;
-      setMsg("保存しました");
-      loadCollections();
-    } catch (e) {
-      setMsg("保存に失敗しました: " + (e.message || e));
-    }
+      const res = await fetch("/api/admin/og-preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key, data: { title: col.title, subtitle: col.subtitle, template: col.template, items } }) });
+      if (!res.ok) throw new Error("プレビューを作れませんでした");
+      const blob = await res.blob();
+      setPreview(URL.createObjectURL(blob));
+    } catch (e) { setMsg(e.message); }
     setBusy(false);
   };
 
-  const removeCollection = async (c) => {
-    if (!window.confirm(`「${c.title}」を削除しますか?`)) return;
-    await supabase.from("collections").delete().eq("id", c.id);
-    if (editing?.id === c.id) { setEditing(null); setItems([]); }
-    loadCollections();
+  const save = async () => {
+    if (!col.title.trim()) return setMsg("タイトルを入れてください");
+    if (items.length < 2 || items.length > 6) return setMsg("商品は2〜6個にしてください");
+    setBusy(true);
+    try {
+      const j = await api("save", { collection: col, items });
+      setCol({ ...col, id: j.id, slug: j.slug });
+      setSaved({ slug: j.slug });
+      setMsg("保存しました");
+      refresh();
+    } catch (e) { setMsg(e.message); }
+    setBusy(false);
   };
 
-  const shareUrl = editing?.slug ? `${typeof window !== "undefined" ? window.location.origin : ""}/c/${editing.slug}` : "";
+  if (!COLLECTIONS_ON) return <div style={{ padding: 40, textAlign: "center" }}>この機能は準備中です。</div>;
 
-  if (!user) {
-    return (
-      <div style={{ maxWidth: 720, margin: "0 auto", padding: 40, textAlign: "center" }}>
-        <h1 style={{ fontSize: 18 }}>商品まとめの作成</h1>
-        <p style={{ fontSize: 13, color: "#64748B" }}>この機能を使うにはログインが必要です。</p>
-        <a href="/" style={{ fontSize: 13, fontWeight: 700, color: "#16324F" }}>← オウダンに戻る</a>
-      </div>
-    );
-  }
+  const shareUrl = saved?.slug && typeof window !== "undefined" ? `${window.location.origin}/c/${saved.slug}` : "";
+  const tweet = shareUrl ? `${col.title}\n\n楽天・Yahoo!・Amazonで今いちばん安いのはどこ?👇\n${shareUrl}\n\n#PR` : "";
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: "20px 14px 60px" }}>
-      <a href="/" style={{ fontSize: 12, fontWeight: 700, color: "#16324F", textDecoration: "none" }}>← オウダンに戻る</a>
-      <h1 style={{ fontSize: 20, fontWeight: 800, margin: "10px 0 4px" }}>🖼 商品まとめを作る</h1>
-      <p style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.7 }}>
-        お気に入りや最近見た商品を並べて、1枚のページとしてSNSで共有できます(最大{MAX_ITEMS}件)。
-      </p>
-
-      {/* 自分のアフィリエイトID */}
-      <div style={{ ...card, marginTop: 14 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 800, margin: "0 0 6px" }}>あなたのアフィリエイトID(任意)</h2>
-        <p style={{ fontSize: 11.5, color: "#475569", lineHeight: 1.7, margin: "0 0 10px" }}>
-          登録すると、<b>あなたが作ったまとめのリンクがあなたのIDに切り替わり</b>、成果はあなたに入ります。
-          未登録の場合はオウダン運営のIDが使われます。各モールのアフィリエイト規約に従ってご利用ください。
-        </p>
-        {[
-          ["楽天アフィリエイトID", "rakuten_affiliate_id", "例: 1a2b3c4d.5e6f7g8h..."],
-          ["バリューコマース sid", "vc_sid", "例: 3518269"],
-          ["バリューコマース pid", "vc_pid", "例: 892657152"],
-          ["Amazonアソシエイトタグ", "amazon_tag", "例: yourname-22"],
-        ].map(([label, key, ph]) => (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7, flexWrap: "wrap" }}>
-            <span style={{ width: 170, fontSize: 12, fontWeight: 700 }}>{label}</span>
-            <input
-              value={aff[key]}
-              onChange={(e) => setAff({ ...aff, [key]: e.target.value.trim() })}
-              placeholder={ph}
-              style={{ flex: 1, minWidth: 180, border: "1px solid #CBD5E1", borderRadius: 8, padding: "8px 10px", fontSize: 16 }}
-            />
+    <div style={{ minHeight: "100vh", background: "#F0F6F4", fontFamily: "'Hiragino Sans','Noto Sans JP',sans-serif", color: "#16324F" }}>
+      <header style={{ background: "#16324F", padding: "12px 16px", color: "#fff", fontWeight: 800 }}>
+        <div className="oud-wrap">オウダン|商品まとめを作る(運営専用)</div>
+      </header>
+      <main className="oud-wrap" style={{ padding: 16 }}>
+        {!authed ? (
+          <div style={box}>
+            <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>合言葉</div>
+            <input type="password" value={key} onChange={(e) => setKey(e.target.value)} onKeyDown={(e) => e.key === "Enter" && login()} style={input} />
+            <button onClick={() => login()} style={{ ...btn(), marginTop: 10, width: "100%" }}>入る</button>
+            {msg && <p style={{ color: "#B91C1C", fontSize: 12.5 }}>{msg}</p>}
           </div>
-        ))}
-        <button onClick={saveAff} style={{ ...btn, background: "#16324F", color: "#fff", marginTop: 4 }}>IDを保存</button>
-        {affMsg && <div style={{ fontSize: 11.5, color: "#059669", fontWeight: 700, marginTop: 8 }}>{affMsg}</div>}
-      </div>
-
-      {/* 既存のまとめ */}
-      <div style={{ ...card, marginTop: 14 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800, margin: 0 }}>作成したまとめ</h2>
-          <button onClick={newCollection} style={{ ...btn, background: "#10B981", color: "#fff", padding: "8px 14px", fontSize: 12 }}>＋ 新しく作る</button>
-        </div>
-        {collections.length === 0 && <p style={{ fontSize: 12, color: "#64748B", margin: 0 }}>まだありません。</p>}
-        {collections.map((c) => (
-          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderTop: "1px solid #EEF2F5" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700 }}>{c.title}</div>
-              <a href={`/c/${c.slug}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#64748B" }}>/c/{c.slug} ↗</a>
-            </div>
-            <button onClick={() => openCollection(c)} style={{ ...btn, background: "#fff", color: "#16324F", border: "1px solid #CBD5E1", padding: "6px 12px", fontSize: 12 }}>編集</button>
-            <button onClick={() => removeCollection(c)} style={{ ...btn, background: "#fff", color: "#B0483C", border: "1px solid #FCA5A5", padding: "6px 10px", fontSize: 12 }}>削除</button>
-          </div>
-        ))}
-      </div>
-
-      {/* 編集 */}
-      {editing && (
-        <div style={{ ...card, marginTop: 14 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 800, margin: "0 0 10px" }}>{editing.id ? "まとめを編集" : "新しいまとめ"}</h2>
-          <input
-            value={editing.title}
-            onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-            placeholder="タイトル(例: 買ってよかった日用品9選)"
-            style={{ width: "100%", boxSizing: "border-box", border: "1px solid #CBD5E1", borderRadius: 8, padding: "9px 12px", fontSize: 16, marginBottom: 8 }}
-          />
-          <textarea
-            value={editing.description || ""}
-            onChange={(e) => setEditing({ ...editing, description: e.target.value })}
-            placeholder="ひとこと説明(任意)"
-            rows={2}
-            style={{ width: "100%", boxSizing: "border-box", border: "1px solid #CBD5E1", borderRadius: 8, padding: "9px 12px", fontSize: 14, resize: "vertical" }}
-          />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, margin: "8px 0" }}>
-            <input type="checkbox" checked={editing.is_public} onChange={(e) => setEditing({ ...editing, is_public: e.target.checked })} />
-            公開する(URLを知っている人が見られます)
-          </label>
-
-          {/* 選んだ商品 */}
-          <div style={{ fontSize: 12.5, fontWeight: 800, margin: "10px 0 6px" }}>並べる商品({items.length}/{MAX_ITEMS})</div>
-          {items.length === 0 && <p style={{ fontSize: 12, color: "#64748B" }}>下の候補から選んでください。</p>}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-            {items.map((it, i) => (
-              <div key={it.product_key} style={{ border: "1px solid #DDE9E4", borderRadius: 10, overflow: "hidden", background: "#fff" }}>
-                <div style={{ width: "100%", aspectRatio: "1 / 1", background: "#EAF3F0" }}>
-                  {it.image && <img src={it.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />}
+        ) : (
+          <>
+            {!col && (
+              <div style={box}>
+                <div style={{ display: "flex", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 15, fontWeight: 800 }}>作ったまとめ</div>
+                  <button onClick={startNew} style={{ ...btn("#10B981"), marginLeft: "auto" }}>+ 新しく作る</button>
                 </div>
-                <div style={{ padding: 6 }}>
-                  <div style={{ fontSize: 10, lineHeight: 1.4, height: "2.8em", overflow: "hidden" }}>{it.name}</div>
-                  <input
-                    value={it.comment || ""}
-                    onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, comment: e.target.value } : x)))}
-                    placeholder="ひとこと"
-                    style={{ width: "100%", boxSizing: "border-box", border: "1px solid #E2E8F0", borderRadius: 6, padding: "4px 6px", fontSize: 11, marginTop: 4 }}
-                  />
-                  <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
-                    <button onClick={() => move(i, -1)} style={{ ...btn, flex: 1, background: "#F1F5F9", color: "#475569", padding: "4px 0", fontSize: 11 }}>←</button>
-                    <button onClick={() => move(i, 1)} style={{ ...btn, flex: 1, background: "#F1F5F9", color: "#475569", padding: "4px 0", fontSize: 11 }}>→</button>
-                    <button onClick={() => setItems(items.filter((_, j) => j !== i))} style={{ ...btn, background: "#FEE2E2", color: "#B0483C", padding: "4px 8px", fontSize: 11 }}>×</button>
+                {list.length === 0 && <p style={{ fontSize: 12.5, color: "#64748B" }}>まだありません。</p>}
+                {list.map((c) => (
+                  <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid #E2E8F0", padding: "10px 0" }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800 }}>{c.title}</div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>{TEMPLATES.find((t) => t.id === c.template)?.label} ・ {c.is_public ? "公開" : "非公開"} ・ <a href={`/c/${c.slug}`} target="_blank" rel="noreferrer">/c/{c.slug} ↗</a></div>
+                    </div>
+                    <button onClick={() => edit(c)} style={btn("#fff", "#16324F")}>編集</button>
+                    <button onClick={() => remove(c)} style={{ ...btn("#fff", "#B91C1C"), border: "1px solid #FCA5A5" }}>削除</button>
+                  </div>
+                ))}
+                {msg && <p style={{ color: "#B91C1C", fontSize: 12.5 }}>{msg}</p>}
+              </div>
+            )}
+
+            {col && (
+              <>
+                <button onClick={() => { setCol(null); refresh(); }} style={{ background: "none", border: "none", color: "#64748B", fontWeight: 700, cursor: "pointer", padding: "0 0 10px" }}>← 一覧に戻る</button>
+
+                <div style={box}>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>① テンプレート</div>
+                  <div className="oud-grid">
+                    {TEMPLATES.map((t) => (
+                      <button key={t.id} onClick={() => setCol({ ...col, template: t.id })}
+                        style={{ textAlign: "left", background: col.template === t.id ? "#ECFDF5" : "#fff", border: col.template === t.id ? "2px solid #10B981" : "1px solid #CBD5E1", borderRadius: 12, padding: 12, cursor: "pointer" }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 800 }}>{t.label}</div>
+                        <div style={{ fontSize: 11.5, color: "#64748B", marginTop: 2 }}>{t.desc}</div>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
 
-          {/* 候補 */}
-          <div style={{ fontSize: 12.5, fontWeight: 800, margin: "14px 0 6px" }}>候補から追加</div>
-          <div style={{ maxHeight: 260, overflowY: "auto", border: "1px solid #EEF2F5", borderRadius: 10 }}>
-            {candidates.length === 0 && <p style={{ fontSize: 12, color: "#64748B", padding: 12, margin: 0 }}>リストや閲覧履歴に商品がありません。</p>}
-            {candidates.map((c) => (
-              <div key={c.product_key} onClick={() => addItem(c)}
-                style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 9px", borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}>
-                {c.image && <img src={c.image} alt="" style={{ width: 34, height: 34, objectFit: "contain", borderRadius: 6, background: "#EAF3F0" }} />}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11.5, lineHeight: 1.4, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>{c.name}</div>
-                  <div style={{ fontSize: 10, color: "#94A3B8" }}>
-                    {c.from}{c.price ? ` ・ ${yen(c.price)}` : ""}
-                    {c.store ? <span style={{ color: STORE_COLOR[c.store], fontWeight: 700 }}> ・ {STORE_LABEL[c.store]}</span> : null}
+                <div style={box}>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>② タイトルと説明</div>
+                  <input value={col.title} onChange={(e) => setCol({ ...col, title: e.target.value })} placeholder="例:乾燥肌さんに本気でおすすめの保湿クリーム TOP3" maxLength={80} style={input} />
+                  <div style={{ fontSize: 10.5, color: "#94A3B8", margin: "3px 0 8px" }}>{col.title.length}/80(OGP画像には44文字まで入ります)</div>
+                  <input value={col.subtitle || ""} onChange={(e) => setCol({ ...col, subtitle: e.target.value })} placeholder="サブタイトル(画像の下段に出ます)例:3サイトの最安をまとめて比較" maxLength={160} style={input} />
+                  <textarea value={col.description || ""} onChange={(e) => setCol({ ...col, description: e.target.value })} placeholder="本文(ページの最初に出る説明。選んだ理由など)" rows={4} style={{ ...input, marginTop: 8, resize: "vertical" }} />
+                  <div style={{ display: "flex", gap: 10, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <input value={col.author_name || ""} onChange={(e) => setCol({ ...col, author_name: e.target.value })} placeholder="作成者名(空欄=オウダン編集部)" maxLength={40} style={{ ...input, flex: 1, minWidth: 200 }} />
+                    <label style={{ fontSize: 13 }}><input type="checkbox" checked={col.is_public !== false} onChange={(e) => setCol({ ...col, is_public: e.target.checked })} /> 公開する</label>
                   </div>
                 </div>
-                <span style={{ fontSize: 16, color: "#10B981", fontWeight: 800 }}>＋</span>
-              </div>
-            ))}
-          </div>
 
-          <button onClick={save} disabled={busy}
-            style={{ ...btn, width: "100%", background: busy ? "#94A3B8" : "#16324F", color: "#fff", marginTop: 12 }}>
-            {busy ? "保存中…" : "保存する"}
-          </button>
-          {msg && <div style={{ fontSize: 12, color: msg.includes("失敗") ? "#B0483C" : "#059669", fontWeight: 700, marginTop: 8 }}>{msg}</div>}
+                <div style={box}>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>③ 商品を選ぶ(2〜6個)</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} placeholder="商品名で探す(自動取得したDBから)" style={input} />
+                    <button onClick={search} style={{ ...btn(), whiteSpace: "nowrap" }}>{searching ? "…" : "探す"}</button>
+                  </div>
+                  {found.length > 0 && (
+                    <div style={{ maxHeight: 360, overflowY: "auto", marginTop: 10, borderTop: "1px solid #E2E8F0" }}>
+                      {found.map((p) => (
+                        <div key={p.pkey} style={{ display: "flex", gap: 10, alignItems: "center", borderBottom: "1px solid #F1F5F9", padding: "8px 0" }}>
+                          {p.image ? <img src={p.image} alt="" style={{ width: 48, height: 48, objectFit: "contain", background: "#F3F6F4", borderRadius: 8 }} /> : <div style={{ width: 48, height: 48, background: "#F3F6F4", borderRadius: 8 }} />}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.35 }}>{p.name}</div>
+                            <Mini prices={p.prices} />
+                          </div>
+                          <button onClick={() => add(p)} disabled={items.some((i) => i.product_key === p.pkey)} style={btn("#10B981")}>追加</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {found.length === 0 && q && !searching && <p style={{ fontSize: 11.5, color: "#94A3B8" }}>見つからないときは、短い言葉(ブランド名など)で探してください。</p>}
+                </div>
 
-          {editing.id && (
-            <div style={{ marginTop: 12, padding: 10, background: "#EAF3F0", borderRadius: 10 }}>
-              <div style={{ fontSize: 11.5, fontWeight: 800, marginBottom: 4 }}>共有URL</div>
-              <div style={{ fontSize: 11.5, wordBreak: "break-all", color: "#16324F" }}>{shareUrl}</div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button
-                  onClick={async () => {
-                    const text = `${editing.title}\n${shareUrl}\n#オウダン #PR`;
-                    try {
-                      if (navigator.share) await navigator.share({ title: editing.title, text, url: shareUrl });
-                      else { await navigator.clipboard.writeText(text); setMsg("共有用テキストをコピーしました"); }
-                    } catch {}
-                  }}
-                  style={{ ...btn, background: "#10B981", color: "#fff", padding: "8px 14px", fontSize: 12 }}
-                >📣 共有する</button>
-                <a href={`/c/${editing.slug}`} target="_blank" rel="noopener noreferrer"
-                  style={{ ...btn, background: "#fff", color: "#16324F", border: "1px solid #CBD5E1", padding: "8px 14px", fontSize: 12, textDecoration: "none" }}>
-                  ページを見る ↗
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+                <div style={box}>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>④ 並び順・ひとこと({items.length}/6)</div>
+                  {items.length === 0 && <p style={{ fontSize: 12.5, color: "#94A3B8" }}>上で商品を追加してください。</p>}
+                  {items.map((it, i) => (
+                    <div key={it.product_key} style={{ borderTop: i ? "1px solid #E2E8F0" : "none", padding: "10px 0" }}>
+                      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, color: "#fff", background: "#16324F", borderRadius: 999, padding: "2px 9px" }}>{i + 1}</div>
+                        {it.image ? <img src={it.image} alt="" style={{ width: 40, height: 40, objectFit: "contain", background: "#F3F6F4", borderRadius: 6 }} /> : null}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700 }}>{it.name}</div>
+                          <Mini prices={it.prices} />
+                        </div>
+                        <button onClick={() => move(i, -1)} style={btn("#fff", "#16324F")}>↑</button>
+                        <button onClick={() => move(i, 1)} style={btn("#fff", "#16324F")}>↓</button>
+                        <button onClick={() => setItems(items.filter((_, x) => x !== i))} style={{ ...btn("#fff", "#B91C1C"), border: "1px solid #FCA5A5" }}>×</button>
+                      </div>
+                      <input value={it.headline} onChange={(e) => setItem(i, "headline", e.target.value)} placeholder="見出し(30字まで)例:コスパ最強・迷ったらこれ" maxLength={30} style={{ ...input, marginTop: 8 }} />
+                      <textarea value={it.comment} onChange={(e) => setItem(i, "comment", e.target.value)} placeholder="ひとこと解説(使ってみた感想・選んだ理由など)" rows={2} maxLength={400} style={{ ...input, marginTop: 6, resize: "vertical" }} />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={box}>
+                  <div style={{ fontSize: 14, fontWeight: 800, marginBottom: 8 }}>⑤ OGP画像と保存</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button onClick={doPreview} disabled={busy || items.length < 1} style={btn("#fff", "#16324F")}>OGP画像をプレビュー</button>
+                    <button onClick={save} disabled={busy} style={btn("#10B981")}>{col.id ? "更新して保存" : "保存して公開URLを作る"}</button>
+                  </div>
+                  {preview && <img src={preview} alt="OGPプレビュー" style={{ width: "100%", marginTop: 12, borderRadius: 10, border: "1px solid #E2E8F0" }} />}
+                  {msg && <p style={{ fontSize: 12.5, color: msg === "保存しました" ? "#059669" : "#B91C1C", fontWeight: 700 }}>{msg}</p>}
+                  {saved && (
+                    <div style={{ background: "#ECFDF5", border: "1px solid #10B981", borderRadius: 10, padding: 12, marginTop: 10 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 800 }}>公開URL</div>
+                      <a href={shareUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, wordBreak: "break-all" }}>{shareUrl}</a>
+                      <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                        <a href={`https://x.com/intent/post?text=${encodeURIComponent(tweet)}`} target="_blank" rel="noreferrer" style={{ ...btn("#000"), textDecoration: "none" }}>Xで投稿する</a>
+                        <button onClick={() => navigator.clipboard.writeText(tweet)} style={btn("#fff", "#16324F")}>投稿文をコピー</button>
+                      </div>
+                      <p style={{ fontSize: 10.5, color: "#065F46", margin: "8px 0 0", lineHeight: 1.6 }}>
+                        Xに貼ると、このURLのOGP画像(3サイトの価格つき)がカードで表示されます。広告なので本文に #PR を必ず入れてください。
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 }

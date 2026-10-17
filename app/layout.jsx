@@ -1,7 +1,8 @@
 export const metadata = {
-  title: "オウダン | 楽天・Yahoo!横断 最安値検索",
+  metadataBase: new URL(process.env.SITE_ORIGIN || "https://oudan.vercel.app"),
+  title: "オウダン | 楽天・Yahoo!・Amazon 横断 最安値比較",
   description:
-    "楽天市場とYahoo!ショッピングをまとめて検索し、同じ商品の最安値を比較。欲しいものリストと価格推移グラフで買い時がわかります。",
+    "楽天市場・Yahoo!ショッピング・Amazonの価格を、ポイント込みの実質価格で比較。90日の中央値との差や「3か月で何番目に安いか」で買い時がわかります。",
 };
 
 const responsiveCss = `

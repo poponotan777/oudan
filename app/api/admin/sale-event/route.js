@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { adminOk } from "../../../../lib/adminAuth";
 
 // セール確定日程の登録(運営者専用)
 // /crawl の管理フォームから呼ばれる。合言葉(NEXT_PUBLIC_CRAWL_KEY)で保護
 export async function POST(request) {
   try {
     const { key, name, store, start_date, end_date, url } = await request.json();
-    const required = process.env.NEXT_PUBLIC_CRAWL_KEY || "";
-    if (required && key !== required) {
+    // v23: 合言葉はサーバー専用の ADMIN_KEY で確認(未設定なら旧 NEXT_PUBLIC_CRAWL_KEY)
+    if (!adminOk(key)) {
       return NextResponse.json({ error: "合言葉が違います" }, { status: 403 });
     }
     if (!name || !store || !start_date) {
