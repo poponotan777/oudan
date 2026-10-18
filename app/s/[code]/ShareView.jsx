@@ -33,6 +33,7 @@ export default function ShareView({ d, code }) {
                 {d.tp !== "pick" && <span className={`o-rank${d.tp === "ranking" && i < 3 ? ` r${i + 1}` : ""}`}>{KICK[d.tp](i)}</span>}
                 {it.head && <div className="o-share-head">{it.head}</div>}
                 <h2 className="o-share-name">{displayName(it.name)}</h2>
+                {it.renamed && <div className="o-note" style={{ margin: "2px 0 0" }}>商品名:{displayName(it.fullName)}</div>}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
                   <Heart label item={{ pkey: it.pkey, name: it.name, image: it.image, inDb: true }} />
                 </div>

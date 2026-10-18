@@ -537,3 +537,7 @@ textarea.o-input { resize: vertical; line-height: 1.6; }
 @media (max-width: 899px) { .o-pv-img { max-height: 260px; } }
 .o-make-item.miss .top .n { color: var(--ink-2); }
 .o-miss { margin: 0; font-size: 13px; color: #8a5a00; background: #fff4cc; border-radius: 8px; padding: 8px 10px; }
+.o-name-edit { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.o-name-edit small { font-weight: 500; color: var(--ink-2); margin-left: 6px; }
+.o-name-edit .row { display: flex; gap: 6px; }
+.o-name-edit .row .o-btn { white-space: nowrap; padding: 8px 12px; font-size: 12px; }

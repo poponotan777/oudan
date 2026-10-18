@@ -157,7 +157,7 @@ function Maker() {
   const plainText = d.i.map((x, n) => {
     const e = cat.get(x.k);
     if (!e) return "";
-    const lines = [`${d.tp === "ranking" ? `${n + 1}位 ` : ""}${x.h ? x.h + "|" : ""}${displayName(e.product?.name || "")}`];
+    const lines = [`${d.tp === "ranking" ? `${n + 1}位 ` : ""}${x.h ? x.h + "|" : ""}${x.n || displayName(e.product?.name || "")}`];
     for (const s of STORE_ORDER) {
       const o = e.offers?.[s];
       const u = plainUrl(s, o?.url);
@@ -254,6 +254,14 @@ function Maker() {
                 </span>
               </div>
               {miss && <p className="o-miss">この商品はオウダンの値段の記録にまだないため、画像と紹介ページには入りません。「探す」から同じ商品か似た商品を選んでください。</p>}
+              <label className="o-name-edit">画像に出す商品名<small>{(x.n || "").length}/{LIMITS.name}・空なら元の名前</small>
+                <span className="row">
+                  <input className="o-input" maxLength={LIMITS.name} value={x.n || ""} onChange={(ev) => setItem(n, "n", ev.target.value)}
+                    placeholder={e ? displayName(e.product?.name || "").slice(0, LIMITS.name) : "商品名"} />
+                  {e && !x.n && <button type="button" className="o-btn" onClick={() => setItem(n, "n", displayName(e.product?.name || "").slice(0, LIMITS.name))}>元の名前を入れて直す</button>}
+                  {x.n && <button type="button" className="o-btn" onClick={() => setItem(n, "n", "")}>元に戻す</button>}
+                </span>
+              </label>
               <input className="o-input" maxLength={LIMITS.head} value={x.h} onChange={(ev) => setItem(n, "h", ev.target.value)} placeholder={`ひとこと(画像に出ます・${LIMITS.head}字まで)例:コスパ最強`} />
               <textarea className="o-input" rows={3} maxLength={LIMITS.comment} value={x.c} onChange={(ev) => setItem(n, "c", ev.target.value)}
                 placeholder={`商品の説明・使い方(紹介ページに出ます・${LIMITS.comment}字まで)`} />
