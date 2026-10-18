@@ -22,6 +22,8 @@ function Maker() {
   const sp = useSearchParams();
   const [d, setD] = useState(EMPTY);
   const [cat, setCat] = useState(new Map()); // pkey → { product, offers }
+  const [meta, setMeta] = useState({}); // 選んだときの名前・画像(DBで見つからないときの表示と、名前で探し直すのに使う)
+  const [missing, setMissing] = useState({}); // DBに無かったキー → true
   const [code, setCode] = useState("");
   const [imgKey, setImgKey] = useState(0);
   const [imgState, setImgState] = useState("idle");
@@ -64,9 +66,30 @@ function Maker() {
   // 選んだ商品の情報(名前・画像・価格)を読む
   const keys = d.i.map((x) => x.k).join("|");
   useEffect(() => {
-    const need = d.i.map((x) => x.k).filter((k) => !cat.has(k));
+    const need = d.i.map((x) => x.k).filter((k) => !cat.has(k) && !missing[k]);
     if (!need.length) return;
-    loadCatalog(supabase, need).then((m) => setCat((old) => { const n = new Map(old); for (const [k, v] of m) n.set(k, v); return n; })).catch(() => {});
+    (async () => {
+      const m = await loadCatalog(supabase, need).catch(() => new Map());
+      setCat((old) => { const n = new Map(old); for (const [k, v] of m) n.set(k, v); return n; });
+      // 見つからなかった商品は、商品名で探し直して、いちばん近い商品に置きかえる
+      for (const k of need.filter((k) => !m.has(k))) {
+        const nm = displayName(meta[k]?.name || "");
+        const words = nm.replace(/[【】\[\]()（）、,.・/|]/g, " ").split(/\s+/).filter((w) => w.length >= 2).slice(0, 3);
+        let hit = null;
+        if (words.length) {
+          let qb = supabase.from("products").select("pkey").is("merged_into", null);
+          for (const w of words) qb = qb.ilike("name", `%${w.replace(/[%_,()]/g, "")}%`);
+          const { data } = await qb.order("pop", { ascending: true, nullsFirst: false }).limit(1);
+          hit = data?.[0]?.pkey || null;
+        }
+        if (hit && hit !== k) {
+          setD((p) => (p.i.some((x) => x.k === hit) ? { ...p, i: p.i.filter((x) => x.k !== k) } : { ...p, i: p.i.map((x) => (x.k === k ? { ...x, k: hit } : x)) }));
+          flash("記録にある同じ商品に置きかえました");
+        } else {
+          setMissing((o) => ({ ...o, [k]: true }));
+        }
+      }
+    })();
   }, [keys]);
 
   // 入力が止まったら、URLと画像を作り直す
@@ -88,7 +111,8 @@ function Maker() {
     return { ...p, i: a };
   });
   const remove = (i) => setD((p) => ({ ...p, i: p.i.filter((_, j) => j !== i) }));
-  const add = (k) => setD((p) => {
+  const add = (k, info) => { if (info) setMeta((o) => ({ ...o, [k]: { name: info.name, image: info.image } })); addKey(k); };
+  const addKey = (k) => setD((p) => {
     if (p.i.some((x) => x.k === k)) return p;
     const max = TEMPLATES.find((t) => t.id === p.tp).max;
     if (p.i.length >= max) {
@@ -119,7 +143,7 @@ function Maker() {
   const favs = useMemo(() => (typeof window === "undefined" ? [] : loadFavorites().filter((f) => f.inDb !== false)), [tab]);
   const recent = useMemo(() => {
     if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem("viewHistory") || "[]").map((v) => ({ pkey: v.key, name: v.name, image: v.image })); } catch { return []; }
+    try { return JSON.parse(localStorage.getItem("viewHistory") || "[]").filter((v) => v.inDb !== false).map((v) => ({ pkey: v.key, name: v.name, image: v.image })); } catch { return []; }
   }, [tab]);
   const pickList = tab === "fav" ? favs : tab === "recent" ? recent : found;
 
@@ -179,7 +203,7 @@ function Maker() {
             {pickList.slice(0, 30).map((it) => {
               const on = d.i.some((x) => x.k === it.pkey);
               return (
-                <button key={it.pkey} className="o-pick" aria-pressed={on} onClick={() => (on ? remove(d.i.findIndex((x) => x.k === it.pkey)) : add(it.pkey))}>
+                <button key={it.pkey} className="o-pick" aria-pressed={on} onClick={() => (on ? remove(d.i.findIndex((x) => x.k === it.pkey)) : add(it.pkey, it))}>
                   {it.image ? <img src={it.image} alt="" loading="lazy" /> : <span className="ph" />}
                   <span className="n">{displayName(it.name)}</span>
                   <span className="mark">{on ? "選択中" : "追加"}</span>
@@ -216,17 +240,20 @@ function Maker() {
         {d.i.length === 0 && <p className="o-note" style={{ margin: 0 }}>上で商品を選ぶと、ここに商品ごとの入力欄が出ます。</p>}
         {d.i.map((x, n) => {
           const e = cat.get(x.k);
+          const miss = !e && missing[x.k];
+          const mm = meta[x.k];
           return (
-            <div key={x.k} className="o-make-item">
+            <div key={x.k} className={`o-make-item${miss ? " miss" : ""}`}>
               <div className="top">
                 {d.tp !== "pick" && <span className={`o-rank${d.tp === "ranking" && n < 3 ? ` r${n + 1}` : ""}`}>{d.tp === "ranking" ? `${n + 1}位` : n + 1}</span>}
-                {e?.product?.image ? <img src={e.product.image} alt="" /> : <span className="ph" />}
-                <span className="n">{e ? displayName(e.product?.name || "") : "読み込んでいます"}</span>
+                {(e?.product?.image || mm?.image) ? <img src={e?.product?.image || mm.image} alt="" /> : <span className="ph" />}
+                <span className="n">{e ? displayName(e.product?.name || "") : miss ? displayName(mm?.name || "この商品") : "読み込んでいます"}</span>
                 <span className="ctl">
                   {d.tp !== "pick" && <><button onClick={() => move(n, -1)} aria-label="上へ">↑</button><button onClick={() => move(n, 1)} aria-label="下へ">↓</button></>}
                   <button onClick={() => remove(n)} aria-label="外す">×</button>
                 </span>
               </div>
+              {miss && <p className="o-miss">この商品はオウダンの値段の記録にまだないため、画像と紹介ページには入りません。「探す」から同じ商品か似た商品を選んでください。</p>}
               <input className="o-input" maxLength={LIMITS.head} value={x.h} onChange={(ev) => setItem(n, "h", ev.target.value)} placeholder={`ひとこと(画像に出ます・${LIMITS.head}字まで)例:コスパ最強`} />
               <textarea className="o-input" rows={3} maxLength={LIMITS.comment} value={x.c} onChange={(ev) => setItem(n, "c", ev.target.value)}
                 placeholder={`商品の説明・使い方(紹介ページに出ます・${LIMITS.comment}字まで)`} />

@@ -74,21 +74,28 @@ export async function imageData(url) {
 }
 
 // ---------- 文字を枠に収める ----------
-// 全角=1文字分、半角英数=0.56文字分として、幅 width・lines 行に収まるように切る(あふれたら …)
+// 楽天などの商品名に入っている &amp; などを元の文字に戻す
+export function decodeEntities(t) {
+  return String(t || "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&nbsp;/g, " ");
+}
+// 文字の幅(全角=1)。半角は字によって幅が違うので、少し広めに見積もる
+const cw = (ch) => (/[A-Z0-9]/.test(ch) ? 0.66 : /[a-z]/.test(ch) ? 0.58 : /[\x20-\x7E]/.test(ch) ? 0.45 : /[｡-ﾟ]/.test(ch) ? 0.55 : 1);
+// 幅 width・lines 行に収まるように切る(あふれたら …)。実際の折り返しより少し手前で切る
 export function fit(text, fontSize, width, lines = 1) {
-  const per = width / fontSize;
+  const per = (width / fontSize) * 0.94;
   let w = 0, line = 1, out = "";
-  for (const ch of String(text || "").replace(/\s+/g, " ").trim()) {
-    const cw = /[\x20-\x7E]/.test(ch) ? 0.56 : 1;
-    if (w + cw > per) {
+  const src = decodeEntities(text).replace(/\s+/g, " ").trim();
+  for (const ch of src) {
+    const c = cw(ch);
+    if (w + c > per) {
       if (line >= lines) return out.replace(/\s+$/, "") + "…";
       line++; w = 0;
     }
-    w += cw; out += ch;
+    w += c; out += ch;
   }
   return out;
 }
-const clip = (s, n) => (String(s || "").length > n ? String(s).slice(0, n - 1) + "…" : String(s || ""));
+const clip = (s, n) => { const t = decodeEntities(s); return t.length > n ? t.slice(0, n - 1) + "…" : t; };
 // 決まった高さの箱(はみ出しても次の部品に重ならない)
 function Box({ h, w, children, style }) {
   const st = { display: "flex", height: h, overflow: "hidden", flexShrink: 0, ...style };
@@ -96,11 +103,30 @@ function Box({ h, w, children, style }) {
   return <div style={st}>{children}</div>;
 }
 
+// ---------- 飾り ----------
+const SHADOW = "0 10px 24px rgba(35,70,255,0.16)";
+const BG = "linear-gradient(160deg, #EAF0FF 0%, #F6F2FF 55%, #FFF6D6 100%)";
+const MEDAL = [
+  { bg: "linear-gradient(135deg, #FFE27A 0%, #F2B705 55%, #C98A00 100%)", ring: "#F2B705", fg: "#5A3B00" },
+  { bg: "linear-gradient(135deg, #F4F6FA 0%, #C3C9D6 55%, #8F97A8 100%)", ring: "#AEB5C4", fg: "#2F3646" },
+  { bg: "linear-gradient(135deg, #F7C99A 0%, #D18A45 55%, #9C5B1E 100%)", ring: "#C9813F", fg: "#3F2306" },
+];
+// ヘッダーの奥の丸い光(にぎやかさ)
+function Glows() {
+  return (
+    <>
+      <div style={{ position: "absolute", display: "flex", width: 340, height: 340, borderRadius: 170, background: "rgba(255,255,255,0.10)", top: -170, right: 120 }} />
+      <div style={{ position: "absolute", display: "flex", width: 200, height: 200, borderRadius: 100, background: "rgba(255,216,77,0.22)", top: -60, right: -40 }} />
+      <div style={{ position: "absolute", display: "flex", width: 120, height: 120, borderRadius: 60, background: "rgba(255,255,255,0.08)", bottom: -70, left: 380 }} />
+    </>
+  );
+}
+
 // ---------- 共通パーツ ----------
 function ImgBox({ src, size, radius = 16 }) {
   return (
-    <div style={{ width: size, height: size, flexShrink: 0, background: "#fff", border: `3px solid ${C.line}`, borderRadius: radius, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-      {src ? <img src={src} width={size - 16} height={size - 16} style={{ objectFit: "contain" }} /> : <div style={{ fontSize: Math.max(14, size * 0.11), color: C.gray, display: "flex" }}>画像なし</div>}
+    <div style={{ width: size, height: size, flexShrink: 0, background: "#fff", borderRadius: radius, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", boxShadow: "inset 0 0 0 2px #E3E8FB" }}>
+      {src ? <img src={src} width={size - 14} height={size - 14} style={{ objectFit: "contain" }} /> : <div style={{ fontSize: Math.max(13, size * 0.11), color: C.gray, display: "flex" }}>画像なし</div>}
     </div>
   );
 }
@@ -112,7 +138,7 @@ function cheapestOf(prices) {
 function Footer({ date }) {
   return (
     <div style={{ display: "flex", alignItems: "center", padding: "0 40px", height: 44, background: C.ink, color: "#fff", fontSize: 18, flexShrink: 0 }}>
-      <div style={{ display: "flex", color: C.tag }}>オウダン</div>
+      <div style={{ display: "flex", color: C.tag, fontSize: 20 }}>オウダン</div>
       <div style={{ display: "flex", marginLeft: 14, opacity: 0.85 }}>oudan.vercel.app</div>
       <div style={{ display: "flex", marginLeft: 20, opacity: 0.85 }}>{date ? `${date}時点の価格(変動します)` : "価格は変動します"}</div>
       <div style={{ display: "flex", marginLeft: "auto", border: "2px solid #fff", borderRadius: 6, padding: "0 10px", fontSize: 16 }}>PR</div>
@@ -120,7 +146,7 @@ function Footer({ date }) {
   );
 }
 
-// 3サイトの値段(縦に3行・高さ固定)
+// 3サイトの値段(縦に3行・高さ固定)。最安は金色の札
 function PriceRows({ prices, fs, rowH, width }) {
   const best = cheapestOf(prices);
   return (
@@ -128,8 +154,11 @@ function PriceRows({ prices, fs, rowH, width }) {
       {STORES.map(([s, label]) => {
         const on = s === best;
         return (
-          <Box key={s} h={rowH} style={{ alignItems: "center", justifyContent: "space-between", padding: "0 10px", borderRadius: 8, background: on ? C.tag : C.bg }}>
-            <div style={{ display: "flex", fontSize: fs * 0.7, color: on ? C.ink : C[s] }}>{label}{on ? " 最安" : ""}</div>
+          <Box key={s} h={rowH} style={{ alignItems: "center", justifyContent: "space-between", padding: "0 10px", borderRadius: 9, ...(on ? { backgroundImage: "linear-gradient(90deg, #FFE680 0%, #FFD84D 100%)", boxShadow: "0 3px 0 #E0A800" } : { background: "#F3F5FD" }) }}>
+            <div style={{ display: "flex", alignItems: "center", fontSize: fs * 0.68, color: on ? C.ink : C[s] }}>
+              {label}
+              {on && <div style={{ display: "flex", marginLeft: 6, fontSize: fs * 0.56, color: "#fff", background: C.ink, borderRadius: 5, padding: "0 6px" }}>最安</div>}
+            </div>
             <div style={{ display: "flex", fontSize: fs, color: prices?.[s] != null ? C.ink : C.gray }}>{yen(prices?.[s])}</div>
           </Box>
         );
@@ -138,17 +167,19 @@ function PriceRows({ prices, fs, rowH, width }) {
   );
 }
 
-function Header({ title, subtitle, kicker, by }) {
-  const tfs = title.length > 22 ? 40 : 48;
+function Header({ title, subtitle, kicker, by, kind }) {
+  const tfs = title.length > 22 ? 42 : 50;
   return (
-    <div style={{ display: "flex", flexDirection: "column", backgroundImage: GRAD, padding: "20px 40px 18px", color: "#fff", flexShrink: 0 }}>
+    <div style={{ display: "flex", position: "relative", overflow: "hidden", flexDirection: "column", backgroundImage: GRAD, padding: "20px 40px 18px", color: "#fff", flexShrink: 0 }}>
+      <Glows />
       <div style={{ display: "flex", alignItems: "center", gap: 12, height: 34 }}>
-        {kicker && <div style={{ display: "flex", background: C.tag, color: C.ink, fontSize: 22, padding: "2px 14px", borderRadius: 8 }}>{kicker}</div>}
+        {kicker && <div style={{ display: "flex", background: C.tag, color: C.ink, fontSize: 22, padding: "2px 14px", borderRadius: 8, boxShadow: "0 3px 0 #E0A800" }}>{kicker}</div>}
+        {kind && <div style={{ display: "flex", fontSize: 20, border: "2px solid rgba(255,255,255,0.7)", borderRadius: 8, padding: "0 10px" }}>{kind}</div>}
         {by && <div style={{ display: "flex", fontSize: 20 }}>{clip(by, 20)}のおすすめ</div>}
-        <div style={{ display: "flex", marginLeft: "auto", fontSize: 20, opacity: 0.9 }}>楽天・Yahoo!・Amazon 3サイト比較</div>
+        <div style={{ display: "flex", marginLeft: "auto", fontSize: 19, opacity: 0.92 }}>楽天・Yahoo!・Amazon 3サイト比較</div>
       </div>
-      <Box h={Math.round(tfs * 1.3)} style={{ fontSize: tfs, marginTop: 6 }}>{fit(title, tfs, 1120, 1)}</Box>
-      {subtitle && <Box h={30} style={{ fontSize: 22, opacity: 0.92, marginTop: 2 }}>{fit(subtitle, 22, 1120, 1)}</Box>}
+      <Box h={Math.round(tfs * 1.3)} style={{ fontSize: tfs, marginTop: 6, textShadow: "0 3px 0 rgba(20,20,80,0.25)" }}>{fit(title, tfs, 1120, 1)}</Box>
+      {subtitle && <Box h={30} style={{ fontSize: 22, opacity: 0.95, marginTop: 2 }}>{fit(subtitle, 22, 1120, 1)}</Box>}
     </div>
   );
 }
@@ -160,87 +191,108 @@ export function CollectionOG({ data }) {
   const n = Math.max(1, items.length);
   const tpl = data.template || "ranking";
   const kicker = tpl === "ranking" ? `TOP${n}` : tpl === "lineup" ? `${n}選` : "比較";
+  const kind = tpl === "ranking" ? "ランキング" : tpl === "lineup" ? "おすすめ" : "3サイト最安比較";
   const title = data.title || "おすすめ";
-  const headerH = 20 + 34 + 6 + Math.round((title.length > 22 ? 40 : 48) * 1.3) + (data.subtitle ? 32 : 0) + 18;
+  const headerH = 20 + 34 + 6 + Math.round((title.length > 22 ? 42 : 50) * 1.3) + (data.subtitle ? 32 : 0) + 18;
   const bodyH = 630 - 44 - headerH;
 
   let body;
   if (tpl === "compare") {
-    const headH = 32;
-    const rowH = Math.floor((bodyH - 24 - headH) / n);
-    const img = Math.min(rowH - 12, 90);
-    const fs = rowH >= 80 ? 22 : rowH >= 60 ? 19 : 16;
-    const colW = 170;
-    const nameW = 1200 - 72 - (img + 16) - colW * 3 - 12;
+    const headH = 36;
+    const pad = 14;
+    const rowH = Math.floor((bodyH - 28 - headH - pad) / n);
+    const img = Math.min(rowH - 10, 86);
+    const fs = rowH >= 80 ? 21 : rowH >= 60 ? 18 : 15;
+    const colW = 150;
+    const tableW = 1200 - 72;
+    const nameW = tableW - pad * 2 - (img + 14) - colW * 3 - 24;
+    const lines = rowH >= 56 ? 2 : 1;
     body = (
-      <div style={{ display: "flex", flexDirection: "column", padding: "12px 36px", height: bodyH }}>
-        <Box h={headH} style={{ alignItems: "center", fontSize: 18, color: C.sub }}>
-          <div style={{ display: "flex", width: img + 16 + nameW + 12 }}>商品</div>
-          {STORES.map(([s, l]) => <div key={s} style={{ display: "flex", width: colW, justifyContent: "flex-end", color: C[s] }}>{l}</div>)}
-        </Box>
-        {items.map((it, i) => {
-          const best = cheapestOf(it.prices);
-          const lines = rowH >= 70 ? 2 : 1;
-          return (
-            <Box key={i} h={rowH} style={{ alignItems: "center", borderTop: `2px solid ${C.line}`, background: i % 2 ? "#F7F9FF" : "#fff" }}>
-              <div style={{ display: "flex", width: img + 16, paddingLeft: 6 }}><ImgBox src={it.image} size={img} radius={10} /></div>
-              <div style={{ display: "flex", flexDirection: "column", width: nameW, marginRight: 12 }}>
-                {it.head && <Box h={Math.round(fs * 1.3)} style={{ fontSize: fs, color: C.ink }}>{fit(it.head, fs, nameW, 1)}</Box>}
-                <Box h={Math.round(fs * 0.8 * 1.3) * (it.head ? 1 : lines)} style={{ fontSize: it.head ? fs * 0.8 : fs, color: it.head ? C.sub : C.ink, lineHeight: 1.3 }}>
-                  {fit(it.name, it.head ? fs * 0.8 : fs, nameW, it.head ? 1 : lines)}
-                </Box>
+      <div style={{ display: "flex", padding: "14px 36px", height: bodyH }}>
+        <div style={{ display: "flex", flexDirection: "column", width: tableW, background: "#fff", borderRadius: 20, boxShadow: SHADOW, padding: `6px ${pad}px ${pad}px`, overflow: "hidden" }}>
+          <Box h={headH} style={{ alignItems: "center", fontSize: 18, color: C.sub }}>
+            <div style={{ display: "flex", width: img + 14 + nameW + 24 }}>商品</div>
+            {STORES.map(([s, l]) => (
+              <div key={s} style={{ display: "flex", width: colW, justifyContent: "center" }}>
+                <div style={{ display: "flex", color: "#fff", background: C[s], borderRadius: 6, padding: "0 10px", fontSize: 16 }}>{l}</div>
               </div>
-              {STORES.map(([s]) => (
-                <div key={s} style={{ display: "flex", width: colW, justifyContent: "flex-end" }}>
-                  <div style={{ display: "flex", fontSize: fs + 4, padding: "2px 10px", borderRadius: 8, color: it.prices?.[s] == null ? C.gray : C.ink, background: s === best ? C.tag : "transparent" }}>
-                    {yen(it.prices?.[s])}
-                  </div>
+            ))}
+          </Box>
+          {items.map((it, i) => {
+            const best = cheapestOf(it.prices);
+            const subFs = Math.round(fs * 0.78);
+            return (
+              <Box key={i} h={rowH} style={{ alignItems: "center", borderTop: `2px solid ${C.line}` }}>
+                <div style={{ display: "flex", width: img + 14 }}><ImgBox src={it.image} size={img} radius={10} /></div>
+                <div style={{ display: "flex", flexDirection: "column", width: nameW, marginRight: 24, justifyContent: "center" }}>
+                  {it.head ? (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <Box h={Math.round(fs * 1.3) + 2} style={{ fontSize: fs, color: C.blue }}>{fit(it.head, fs, nameW, 1)}</Box>
+                      <Box h={Math.round(subFs * 1.35) + 2} style={{ fontSize: subFs, color: C.sub }}>{fit(it.name, subFs, nameW, 1)}</Box>
+                    </div>
+                  ) : (
+                    <Box h={Math.round(fs * 1.3) * lines + 4} style={{ fontSize: fs, color: C.ink, lineHeight: 1.3 }}>{fit(it.name, fs, nameW, lines)}</Box>
+                  )}
                 </div>
-              ))}
-            </Box>
-          );
-        })}
+                {STORES.map(([s]) => (
+                  <div key={s} style={{ display: "flex", width: colW, justifyContent: "center" }}>
+                    <div style={{ display: "flex", fontSize: fs + 3, padding: "3px 10px", borderRadius: 9, color: it.prices?.[s] == null ? C.gray : C.ink, ...(s === best ? { background: C.tag, boxShadow: "0 3px 0 #E0A800" } : {}) }}>
+                      {yen(it.prices?.[s])}
+                    </div>
+                  </div>
+                ))}
+              </Box>
+            );
+          })}
+        </div>
       </div>
     );
   } else {
     const gap = 14;
     const cardW = Math.floor((1200 - 72 - gap * (n - 1)) / n);
-    const innerW = cardW - 20;
+    const innerW = cardW - 24;
     const cardH = bodyH - 28;
-    // 上から:順位(30)・画像・ひとこと(1行)・商品名(2行)・値段(3行)。高さはすべて固定
+    // 上から:順位・画像・ひとこと(1行)・商品名(2行)・値段(3行)。高さはすべて固定
     const priceFs = n <= 2 ? 26 : n === 3 ? 23 : n === 4 ? 20 : 17;
     const rowH = Math.round(priceFs * 1.45);
-    const priceH = rowH * 3 + 8;
+    const priceH = rowH * 3 + 8 + 3;
     const headFs = n <= 3 ? 22 : n === 4 ? 19 : 16;
     const nameFs = n <= 3 ? 17 : n === 4 ? 15 : 13;
-    const headH = items.some((x) => x.head) ? Math.round(headFs * 1.35) : 0;
-    const nameLines = 2;
-    const nameH = Math.round(nameFs * 1.35) * nameLines + 6;
-    const fixed = 30 + 8 + headH + nameH + priceH + 8 * 3 + 20;
+    const headH = items.some((x) => x.head) ? Math.round(headFs * 1.35) + 2 : 0;
+    const nameH = Math.round(nameFs * 1.35) * 2 + 6;
+    const badgeH = tpl === "ranking" ? 38 : 30;
+    const fixed = badgeH + 8 + headH + nameH + priceH + 8 * 3 + 24;
     const img = Math.max(60, Math.min(innerW, cardH - fixed));
-    const medal = ["#E3A008", "#8F97A8", "#B7791F"];
     body = (
       <div style={{ display: "flex", padding: "14px 36px", gap, height: bodyH }}>
-        {items.map((it, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: cardW, height: cardH, background: C.card, border: `2px solid ${C.line}`, borderRadius: 18, padding: 10 }}>
-            <Box h={30} w={innerW} style={{ alignItems: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: tpl === "ranking" ? 62 : 30, height: 30, borderRadius: 15, background: tpl === "ranking" ? (medal[i] || C.blue) : C.blue, color: "#fff", fontSize: 19 }}>
-                {tpl === "ranking" ? `${i + 1}位` : `${i + 1}`}
-              </div>
-            </Box>
-            <div style={{ display: "flex", marginTop: 8 }}><ImgBox src={it.image} size={img} radius={14} /></div>
-            {headH > 0 && <Box h={headH} w={innerW} style={{ fontSize: headFs, color: C.blue, marginTop: 8 }}>{it.head ? fit(it.head, headFs, innerW, 1) : ""}</Box>}
-            <Box h={nameH} w={innerW} style={{ fontSize: nameFs, color: C.ink, lineHeight: 1.35, marginTop: headH ? 2 : 8 }}>{fit(it.name, nameFs, innerW, nameLines)}</Box>
-            <div style={{ display: "flex", marginTop: "auto" }}><PriceRows prices={it.prices} fs={priceFs} rowH={rowH} width={innerW} /></div>
-          </div>
-        ))}
+        {items.map((it, i) => {
+          const m = tpl === "ranking" ? MEDAL[i] : null;
+          return (
+            <div key={i} style={{ display: "flex", position: "relative", flexDirection: "column", alignItems: "center", width: cardW, height: cardH, background: C.card, borderRadius: 20, padding: 12, boxShadow: SHADOW, border: m && i === 0 ? `4px solid ${m.ring}` : "4px solid transparent" }}>
+              <Box h={badgeH} w={innerW} style={{ alignItems: "center", gap: 8 }}>
+                {tpl === "ranking" ? (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: 74, height: 38, borderRadius: 19, backgroundImage: m ? m.bg : GRAD, color: m ? m.fg : "#fff", fontSize: 22, boxShadow: "0 3px 0 rgba(0,0,0,0.15)" }}>
+                    <div style={{ display: "flex", fontSize: 26 }}>{i + 1}</div><div style={{ display: "flex", fontSize: 17, marginLeft: 1 }}>位</div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 15, backgroundImage: GRAD, color: "#fff", fontSize: 17 }}>{i + 1}</div>
+                )}
+                {tpl === "ranking" && i === 0 && innerW >= 250 && <div style={{ display: "flex", fontSize: 15, color: "#8A5A00", background: "#FFF1BF", borderRadius: 6, padding: "1px 8px" }}>いちばんのおすすめ</div>}
+              </Box>
+              <div style={{ display: "flex", marginTop: 8 }}><ImgBox src={it.image} size={img} radius={14} /></div>
+              {headH > 0 && <Box h={headH} w={innerW} style={{ fontSize: headFs, color: C.blue, marginTop: 8 }}>{it.head ? fit(it.head, headFs, innerW, 1) : ""}</Box>}
+              <Box h={nameH} w={innerW} style={{ fontSize: nameFs, color: C.ink, lineHeight: 1.35, marginTop: headH ? 2 : 8 }}>{fit(it.name, nameFs, innerW, 2)}</Box>
+              <div style={{ display: "flex", marginTop: "auto" }}><PriceRows prices={it.prices} fs={priceFs} rowH={rowH} width={innerW} /></div>
+            </div>
+          );
+        })}
       </div>
     );
   }
 
   return (
-    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", background: C.bg, fontFamily: "NotoJP" }}>
-      <Header title={title} subtitle={data.subtitle || ""} kicker={kicker} by={data.by || ""} />
+    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", backgroundImage: BG, fontFamily: "NotoJP" }}>
+      <Header title={title} subtitle={data.subtitle || ""} kicker={kicker} kind={kind} by={data.by || ""} />
       {body}
       <Footer date={data.date} />
     </div>
@@ -251,38 +303,39 @@ export function CollectionOG({ data }) {
 //  data: { name, image, prices, date, off, lowest }
 export function ProductOG({ data }) {
   const best = cheapestOf(data.prices);
-  const name = fit(data.name, 34, 700, 2);
+  const name = fit(data.name, 32, 700, 2);
   return (
-    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", background: C.bg, fontFamily: "NotoJP" }}>
-      <div style={{ display: "flex", alignItems: "center", backgroundImage: GRAD, color: "#fff", padding: "0 40px", height: 64, fontSize: 26, flexShrink: 0 }}>
-        <div style={{ display: "flex" }}>どこがいちばん安い?</div>
-        <div style={{ display: "flex", marginLeft: 14, fontSize: 20, opacity: 0.9 }}>楽天・Yahoo!・Amazon 3サイト比較</div>
+    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", backgroundImage: BG, fontFamily: "NotoJP" }}>
+      <div style={{ display: "flex", position: "relative", overflow: "hidden", alignItems: "center", backgroundImage: GRAD, color: "#fff", padding: "0 40px", height: 68, flexShrink: 0 }}>
+        <Glows />
+        <div style={{ display: "flex", fontSize: 30, textShadow: "0 3px 0 rgba(20,20,80,0.25)" }}>どこがいちばん安い?</div>
+        <div style={{ display: "flex", marginLeft: 16, fontSize: 20, opacity: 0.92 }}>楽天・Yahoo!・Amazon 3サイト比較</div>
       </div>
-      <div style={{ display: "flex", flex: 1, padding: "26px 40px 22px", gap: 34, alignItems: "center" }}>
-        <div style={{ display: "flex", position: "relative" }}>
-          <ImgBox src={data.image} size={360} radius={24} />
+      <div style={{ display: "flex", flex: 1, padding: "22px 40px 22px", gap: 30, alignItems: "center" }}>
+        <div style={{ display: "flex", padding: 14, background: "#fff", borderRadius: 30, boxShadow: SHADOW }}>
+          <ImgBox src={data.image} size={350} radius={22} />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", width: 726, justifyContent: "center" }}>
-          <Box h={Math.round(34 * 1.32) * 2 + 6} style={{ fontSize: 34, color: C.ink, lineHeight: 1.32 }}>{name}</Box>
-          <Box h={44} style={{ gap: 10, marginTop: 10, alignItems: "center" }}>
-            {data.off > 0 && <div style={{ display: "flex", background: C.red, color: "#fff", fontSize: 26, padding: "2px 14px", borderRadius: 10 }}>ふだんより{data.off}%安い</div>}
-            {data.lowest && <div style={{ display: "flex", background: C.mint, color: "#fff", fontSize: 24, padding: "2px 14px", borderRadius: 10 }}>3か月で最安値</div>}
+        <div style={{ display: "flex", flexDirection: "column", width: 712, justifyContent: "center" }}>
+          <Box h={Math.round(32 * 1.32) * 2 + 6} style={{ fontSize: 32, color: C.ink, lineHeight: 1.32 }}>{name}</Box>
+          <Box h={46} style={{ gap: 10, marginTop: 10, alignItems: "center" }}>
+            {data.off > 0 && <div style={{ display: "flex", background: C.red, color: "#fff", fontSize: 26, padding: "2px 16px", borderRadius: 10, boxShadow: "0 3px 0 #B52F1A" }}>ふだんより{data.off}%安い</div>}
+            {data.lowest && <div style={{ display: "flex", background: C.mint, color: "#fff", fontSize: 24, padding: "2px 16px", borderRadius: 10, boxShadow: "0 3px 0 #13744A" }}>3か月で最安値</div>}
           </Box>
           {best && (
-            <div style={{ display: "flex", alignItems: "center", marginTop: 14, background: C.tag, borderRadius: 18, padding: "10px 22px", height: 120, border: `4px solid ${C.tagDeep}` }}>
+            <div style={{ display: "flex", position: "relative", alignItems: "center", marginTop: 14, backgroundImage: "linear-gradient(120deg, #FFF0A8 0%, #FFD84D 60%, #FFC633 100%)", borderRadius: 22, padding: "10px 26px", height: 132, boxShadow: "0 6px 0 #E0A800, 0 14px 28px rgba(224,168,0,0.35)" }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", fontSize: 22, color: C.ink }}>いちばん安い</div>
-                <div style={{ display: "flex", fontSize: 30, color: C[best] }}>{STORES.find((x) => x[0] === best)[1]}</div>
+                <div style={{ display: "flex", fontSize: 22, color: C.ink, background: "#fff", borderRadius: 999, padding: "0 12px", alignSelf: "flex-start" }}>いちばん安い</div>
+                <div style={{ display: "flex", fontSize: 34, color: C[best], marginTop: 6 }}>{STORES.find((x) => x[0] === best)[1]}</div>
               </div>
               <div style={{ display: "flex", marginLeft: "auto", alignItems: "baseline", color: C.ink }}>
-                <div style={{ display: "flex", fontSize: 40 }}>¥</div>
-                <div style={{ display: "flex", fontSize: 84, lineHeight: 1 }}>{num(data.prices[best])}</div>
+                <div style={{ display: "flex", fontSize: 42 }}>¥</div>
+                <div style={{ display: "flex", fontSize: 92, lineHeight: 1 }}>{num(data.prices[best])}</div>
               </div>
             </div>
           )}
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <div style={{ display: "flex", gap: 12, marginTop: 18 }}>
             {STORES.filter(([s]) => s !== best).map(([s, l]) => (
-              <div key={s} style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "space-between", padding: "8px 16px", borderRadius: 12, background: "#fff", border: `2px solid ${C.line}` }}>
+              <div key={s} style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "space-between", padding: "10px 18px", borderRadius: 14, background: "#fff", boxShadow: SHADOW }}>
                 <div style={{ display: "flex", fontSize: 24, color: C[s] }}>{l}</div>
                 <div style={{ display: "flex", fontSize: 32, color: data.prices?.[s] == null ? C.gray : C.ink }}>{yen(data.prices?.[s])}</div>
               </div>
@@ -303,30 +356,31 @@ export function PickOG({ data }) {
   const pts = (data.points || []).slice(0, 3);
   const title = data.title || it.head || it.name || "";
   return (
-    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", background: C.bg, fontFamily: "NotoJP" }}>
-      <div style={{ display: "flex", alignItems: "center", backgroundImage: GRAD, color: "#fff", padding: "0 40px", gap: 16, height: 84, flexShrink: 0 }}>
-        <div style={{ display: "flex", background: C.tag, color: C.ink, fontSize: 22, padding: "3px 14px", borderRadius: 8, flexShrink: 0 }}>{data.by ? `${clip(data.by, 14)}のおすすめ` : "おすすめ"}</div>
-        <Box h={52} w={840} style={{ fontSize: 38, alignItems: "center" }}>{fit(title, 38, 840, 1)}</Box>
+    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", backgroundImage: BG, fontFamily: "NotoJP" }}>
+      <div style={{ display: "flex", position: "relative", overflow: "hidden", alignItems: "center", backgroundImage: GRAD, color: "#fff", padding: "0 40px", gap: 16, height: 88, flexShrink: 0 }}>
+        <Glows />
+        <div style={{ display: "flex", background: C.tag, color: C.ink, fontSize: 22, padding: "3px 14px", borderRadius: 8, flexShrink: 0, boxShadow: "0 3px 0 #E0A800" }}>{data.by ? `${clip(data.by, 14)}のおすすめ` : "おすすめ"}</div>
+        <Box h={56} w={840} style={{ fontSize: 40, alignItems: "center", textShadow: "0 3px 0 rgba(20,20,80,0.25)" }}>{fit(title, 40, 840, 1)}</Box>
       </div>
-      <div style={{ display: "flex", flex: 1, padding: "22px 40px 20px", gap: 30 }}>
-        <div style={{ display: "flex", flexDirection: "column", width: 320, gap: 10 }}>
-          <ImgBox src={it.image} size={320} radius={22} />
-          <Box h={58} w={320} style={{ fontSize: 18, color: C.sub, lineHeight: 1.4 }}>{fit(it.name, 18, 320, 2)}</Box>
+      <div style={{ display: "flex", flex: 1, padding: "20px 40px 20px", gap: 28 }}>
+        <div style={{ display: "flex", flexDirection: "column", width: 330, padding: 12, background: "#fff", borderRadius: 26, boxShadow: SHADOW, gap: 8 }}>
+          <ImgBox src={it.image} size={306} radius={18} />
+          <Box h={56} w={306} style={{ fontSize: 17, color: C.sub, lineHeight: 1.45 }}>{fit(it.name, 17, 306, 2)}</Box>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", width: 770 }}>
+        <div style={{ display: "flex", flexDirection: "column", width: 762 }}>
           {pts.map((p, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, background: "#fff", border: `2px solid ${C.line}`, borderRadius: 14, padding: "0 16px", height: 68, marginBottom: 10 }}>
-              <div style={{ display: "flex", width: 40, height: 40, borderRadius: 20, backgroundImage: GRAD, color: "#fff", fontSize: 22, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
-              <Box h={40} w={680} style={{ fontSize: 28, color: C.ink, alignItems: "center" }}>{fit(p, 28, 680, 1)}</Box>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, background: "#fff", borderRadius: 16, padding: "0 16px", height: 66, marginBottom: 10, boxShadow: SHADOW }}>
+              <div style={{ display: "flex", width: 42, height: 42, borderRadius: 21, backgroundImage: GRAD, color: "#fff", fontSize: 22, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+              <Box h={40} w={670} style={{ fontSize: 28, color: C.ink, alignItems: "center" }}>{fit(p, 28, 670, 1)}</Box>
             </div>
           ))}
           <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
             {STORES.map(([s, l]) => {
               const on = s === best;
               return (
-                <div key={s} style={{ display: "flex", flexDirection: "column", flex: 1, padding: "8px 16px", borderRadius: 14, background: on ? C.tag : "#fff", border: on ? `3px solid ${C.tagDeep}` : `2px solid ${C.line}` }}>
+                <div key={s} style={{ display: "flex", flexDirection: "column", flex: 1, padding: "8px 16px", borderRadius: 16, ...(on ? { backgroundImage: "linear-gradient(120deg, #FFF0A8 0%, #FFD84D 70%)", boxShadow: "0 5px 0 #E0A800" } : { background: "#fff", boxShadow: SHADOW }) }}>
                   <div style={{ display: "flex", fontSize: 20, color: on ? C.ink : C[s] }}>{l}{on ? " いちばん安い" : ""}</div>
-                  <div style={{ display: "flex", fontSize: on ? 40 : 32, color: it.prices?.[s] == null ? C.gray : C.ink }}>{yen(it.prices?.[s])}</div>
+                  <div style={{ display: "flex", fontSize: on ? 42 : 32, color: it.prices?.[s] == null ? C.gray : C.ink }}>{yen(it.prices?.[s])}</div>
                 </div>
               );
             })}

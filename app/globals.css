@@ -535,3 +535,5 @@ textarea.o-input { resize: vertical; line-height: 1.6; }
 .o-bigprice .amt .pre { font-family: var(--font); font-size: 18px; font-weight: 900; margin-right: 6px; }
 .o-bigprice .eff b { font-size: 18px; color: #1f2350; margin: 0 2px; }
 @media (max-width: 899px) { .o-pv-img { max-height: 260px; } }
+.o-make-item.miss .top .n { color: var(--ink-2); }
+.o-miss { margin: 0; font-size: 13px; color: #8a5a00; background: #fff4cc; border-radius: 8px; padding: 8px 10px; }
