@@ -3,7 +3,6 @@
 //   煽らない:ここに出す数字は、オウダンが記録した値段とセールの予定からだけ作る
 import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay } from "../../lib/priceView";
 import { upcomingSales, daysUntil } from "../../lib/saleCalendar";
-import { PriceTag } from "./PriceCompare";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
 
@@ -25,6 +24,9 @@ export default function BuyBox({ offers, rates, name, onBuy }) {
   const worst = [...list].sort((a, b) => b.eff - a.eff)[0];
   const st = statsFor(best.o.price, best.o);
   const v = verdict(st);
+  const ok = st && st.days >= 7;
+  const off = ok && st.diffPct <= -1 ? Math.round(-st.diffPct) : 0;
+  const gain = ok && st.median > best.o.price ? st.median - best.o.price : 0;
   const save = list.length >= 2 ? worst.eff - best.eff : 0;
   // 90日の中での位置(左=最安、右=最高)
   const vals = (best.o.hist || []).filter((x) => x != null).map(Number);
@@ -37,7 +39,27 @@ export default function BuyBox({ offers, rates, name, onBuy }) {
 
   return (
     <div className="o-buy">
-      <PriceTag price={best.o.price} store={best.s} eff={best.eff} onWhite />
+      <div className="o-bigprice">
+        {Math.round(best.eff) < Math.round(best.o.price) ? (
+          <>
+            <div className="who">ポイント込みなら<span className={`o-store ${best.s}`}>{STORE_META[best.s].short}</span>がいちばん安い</div>
+            <div className="amt o-num"><span className="pre">実質</span><span className="yen">¥</span>{num(best.eff)}</div>
+            <div className="eff">支払う金額 <b className="o-num">¥{num(best.o.price)}</b>(ポイント約¥{num(best.o.price - best.eff)}分を引いた額)</div>
+          </>
+        ) : (
+          <>
+            <div className="who"><span className={`o-store ${best.s}`}>{STORE_META[best.s].short}</span>がいちばん安い</div>
+            <div className="amt o-num"><span className="yen">¥</span>{num(best.o.price)}</div>
+          </>
+        )}
+        {(off > 0 || st?.isLowest) && (
+          <div className="deals">
+            {off > 0 && <span className="o-off">ふだんより<b className="o-num">{off}%</b>安い</span>}
+            {gain > 0 && <span className="o-gain"><b className="o-num">¥{num(gain)}</b>おトク</span>}
+            {st?.isLowest && st.days >= 7 && <span className="o-low">{st.days}日でいちばん安い</span>}
+          </div>
+        )}
+      </div>
       <div className={`o-verdict ${v.tone}`}>
         <div className="o-verdict-top">
           <span className="o-verdict-word">{v.word}</span>

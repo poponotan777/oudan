@@ -26,6 +26,7 @@ import Heart from "./components/Heart";
 import InstallCard from "./components/InstallCard";
 import ShareCard from "./components/ShareCard";
 import Feed from "./components/Feed";
+import Reco from "./components/Reco";
 import BuyBox from "./components/BuyBox";
 import PriceChart from "./components/PriceChart";
 import { cardsFor } from "../lib/cards";
@@ -185,6 +186,7 @@ function Detail({ product, rates, viewHistory, onOpenRelated }) {
       {db && <div className="o-box" style={{ marginTop: 12 }}><BuyBox offers={db.offers} rates={rates} name={product.name} /></div>}
       <PriceCompare name={product.name} offers={product.offers} dbOffers={db?.offers} rates={rates} showTag={!db} />
       {db && <PriceChart offers={db.offers} />}
+      {db && <Reco keys={[db.pkey]} />}
 
       {totalReviews > 0 && (
         <section>
@@ -438,7 +440,7 @@ export default function Home() {
     const key = p.key || p.jan;
     if (!key) return;
     setViewHistory((prev) => {
-      const entry = { key, name: p.name, image: p.image, price: p.offers ? Math.min(...p.offers.map((o) => o.price)) : null, store: p.offers?.[0]?.store, at: Date.now() };
+      const entry = { key: p.db?.pkey || key, name: p.name, image: p.image, price: p.offers ? Math.min(...p.offers.map((o) => o.price)) : null, store: p.offers?.[0]?.store, inDb: !!p.db, at: Date.now() };
       const next = [entry, ...prev.filter((x) => x.key !== key)].slice(0, 30);
       try { localStorage.setItem("viewHistory", JSON.stringify(next)); } catch {}
       return next;
@@ -520,6 +522,7 @@ export default function Home() {
             <TodayStrip status={status} sheetEvents={saleEvents} onEdit={goSettings} />
             <SaleCalendarList sheetEvents={saleEvents} loaded={saleLoaded} />
             <TopPicks rates={effRates} />
+            <Reco mode="home" keys={viewHistory.filter((v) => v.inDb !== false).map((v) => v.key).slice(0, 3)} />
             <Feed />
             <Strip title="最近見た商品" items={viewHistory} onOpen={(it) => openFromList({ jan: it.key, name: it.name, image: it.image })} />
             

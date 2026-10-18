@@ -2,7 +2,7 @@
 import { ImageResponse } from "next/og";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadProduct } from "../../../lib/catalog";
-import { STORE_ORDER, statsFor, statsLabel } from "../../../lib/priceView";
+import { STORE_ORDER, statsFor } from "../../../lib/priceView";
 import { ProductOG, ogFonts, imageData, OG_SIZE, jstStamp } from "../../../lib/og";
 
 export const size = OG_SIZE;
@@ -24,14 +24,16 @@ export default async function Image({ params }) {
     if (o?.updated_at && (!newest || o.updated_at > newest)) newest = o.updated_at;
     if (o && (!best || o.price < best.price)) best = o;
   }
-  const lab = best ? statsLabel(statsFor(best.price, best)) : null;
+  const st = best ? statsFor(best.price, best) : null;
+  const ok = st && st.days >= 7;
   const data = {
     name: d?.product?.name || "商品",
     image: await imageData(d?.product?.image),
     prices,
     date: newest ? jstStamp(newest) : jstStamp(),
-    statLine: lab && lab.tone !== "none" ? `${lab.main}・${lab.sub}` : "",
+    off: ok && st.diffPct <= -1 ? Math.round(-st.diffPct) : 0,
+    lowest: !!(ok && st.isLowest),
   };
-  const fonts = await ogFonts(data.name + data.statLine);
+  const fonts = await ogFonts(data.name);
   return new ImageResponse(<ProductOG data={data} />, { ...OG_SIZE, fonts });
 }

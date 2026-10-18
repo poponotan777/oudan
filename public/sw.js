@@ -2,7 +2,7 @@
 //  ・ホーム画面・デスクトップに追加できるようにするための最小限のもの
 //  ・価格はいつも最新を取りに行く(APIはキャッシュしない)
 //  ・電波が無いときだけ、前に開いたトップ画面を出す
-const CACHE = "oudan-v25";
+const CACHE = "oudan-v27";
 const SHELL = ["/", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (e) => {

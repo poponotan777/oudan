@@ -8,14 +8,14 @@
   --ink: #1f2350;        /* 藍:文字・ヘッダー */
   --ink-2: #3c3f66;      /* 二番目の文字 */
   --ink-3: #4f5278;      /* 補足(薄くしすぎない) */
-  --brand: #1f2350;      /* ヘッダー・濃いボタンの地(ダークでも濃いまま) */
-  --brand-2: #2d3270;
+  --brand: #2346ff;      /* ヘッダー・濃いボタンの地(元気な青) */
+  --brand-2: #6a3dff;
   --on-tag: #1f2350;     /* 黄色の上の文字 */
-  --head-sub: #e6e8ff;   /* ヘッダーの小さい文字 */
+  --head-sub: #f1f2ff;   /* ヘッダーの小さい文字 */
   --shadow: 0 1px 0 rgba(31,35,80,.06), 0 6px 18px -10px rgba(31,35,80,.25);
   --t-rakuten: #bf0000; --t-yahoo: #e60033; --t-amazon: #b35f00;
   --paper: #ffffff;
-  --mist: #eef0f7;       /* 背景 */
+  --mist: #f1f4ff;       /* 背景 */
   --line: #dfe2ee;
   --tag: #ffd84d;        /* 値札の黄 */
   --tag-deep: #f2b705;
@@ -57,7 +57,7 @@ img { max-width: 100%; }
 .o-num { font-family: var(--num); font-weight: 700; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
 
 /* ---------- ヘッダー ---------- */
-.o-header { background: linear-gradient(180deg, var(--brand) 0%, var(--brand-2) 100%); color: #fff; position: sticky; top: 0; z-index: 20; }
+.o-header { background: linear-gradient(120deg, var(--brand) 0%, var(--brand-2) 100%); color: #fff; position: sticky; top: 0; z-index: 20; }
 .o-header-row { display: flex; align-items: center; gap: 12px; padding: 12px 0 10px; }
 .o-logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: #fff; background: none; border: none; padding: 0; cursor: pointer; }
 .o-logo-mark { width: 26px; height: 26px; }
@@ -326,8 +326,8 @@ button.o-tile { border: none; text-align: left; cursor: pointer; font-family: in
 .o-tile { border: 1px solid var(--line); }
 .o-item { border: 1px solid var(--line); }
 body { background: var(--mist) radial-gradient(1200px 380px at 50% -120px, var(--glow), transparent 70%) no-repeat; }
-:root { --glow: #dfe4ff; }
-.o-header { box-shadow: 0 2px 0 var(--tag-deep); }
+:root { --glow: #dce4ff; }
+.o-header { box-shadow: 0 3px 0 var(--tag); }
 .o-picks-more { margin-top: 12px; }
 /* 横スライダー */
 .o-slider { position: relative; }
@@ -354,7 +354,7 @@ body { background: var(--mist) radial-gradient(1200px 380px at 50% -120px, var(-
   :root {
     --ink: #eef0ff; --ink-2: #d2d5f2; --ink-3: #b3b7df;
     --paper: #1d2142; --mist: #121530; --line: #353a68;
-    --brand: #15183a; --brand-2: #22266a;
+    --brand: #2236c9; --brand-2: #4b2bb8;
     --wakaba: #5fdc9f; --wakaba-soft: #143a2b;
     --shu: #ff8a70; --shu-soft: #3e1f1a;
     --t-rakuten: #ff6b6b; --t-yahoo: #ff6b8a; --t-amazon: #ffb340;
@@ -505,3 +505,33 @@ textarea.o-input { resize: vertical; line-height: 1.6; }
 .o-fav-diff { font-size: 12.5px; font-weight: 900; margin-top: 3px; border-radius: 6px; padding: 1px 6px; display: inline-block; }
 .o-fav-diff.down { color: var(--wakaba); background: var(--wakaba-soft); }
 .o-fav-diff.up { color: #8a5a00; background: #fff4cc; }
+
+/* ---------- v27 おすすめ ---------- */
+.o-rail > .o-tile { flex: 0 0 168px; scroll-snap-align: start; }
+@media (min-width: 900px) { .o-rail > .o-tile { flex-basis: 200px; } }
+.o-rail .o-tile-img { height: 132px; }
+.o-reco-group { margin-top: 10px; }
+.o-reco-group section .o-h2 { display: none; }
+.o-reco-label { display: inline-block; font-size: 13px; font-weight: 900; background: var(--brand); color: #fff; border-radius: 999px; padding: 3px 12px; margin-bottom: 6px; }
+
+/* ---------- v27 商品ページの主役(画像・値段・お得感) ---------- */
+.o-pv-hero { display: grid; gap: 14px; background: var(--paper); border-radius: var(--radius-l); padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+@media (min-width: 900px) { .o-pv-hero { grid-template-columns: 420px 1fr; gap: 28px; padding: 22px; } }
+.o-pv-img { width: 100%; aspect-ratio: 1; max-height: 420px; object-fit: contain; background: #fff; border-radius: var(--radius-l); border: 1px solid var(--line); }
+@media (max-width: 899px) { .o-pv-img { max-height: 320px; } }
+.o-pv-info h1 { font-size: 18px; font-weight: 900; line-height: 1.45; margin: 2px 0 0; }
+@media (min-width: 900px) { .o-pv-info h1 { font-size: 21px; } }
+.o-bigprice { background: linear-gradient(135deg, #fff7d1, #ffe680); border: 3px solid var(--tag-deep); border-radius: var(--radius-l); padding: 12px 16px 14px; color: #1f2350; }
+.o-bigprice .who { font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 6px; }
+.o-bigprice .amt { font-size: 56px; line-height: 1; margin-top: 4px; letter-spacing: -.01em; }
+.o-bigprice .amt .yen { font-size: 28px; margin-right: 2px; }
+.o-bigprice .eff { font-size: 14px; font-weight: 700; margin-top: 4px; }
+.o-bigprice .eff b { font-size: 22px; color: #15724a; margin-left: 4px; }
+.o-bigprice .deals { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.o-off, .o-gain, .o-low { display: inline-flex; align-items: baseline; gap: 2px; border-radius: 10px; padding: 4px 12px; font-size: 14px; font-weight: 900; color: #fff; }
+.o-off { background: var(--shu); } .o-off b { font-size: 24px; }
+.o-gain { background: #1f2350; } .o-gain b { font-size: 20px; }
+.o-low { background: #15724a; }
+.o-bigprice .amt .pre { font-family: var(--font); font-size: 18px; font-weight: 900; margin-right: 6px; }
+.o-bigprice .eff b { font-size: 18px; color: #1f2350; margin: 0 2px; }
+@media (max-width: 899px) { .o-pv-img { max-height: 260px; } }

@@ -10,6 +10,7 @@ export default function Feed() {
   const [page, setPage] = useState(0);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false); // 最初は半分だけ見せる
 
   const load = async (c, p) => {
     setBusy(true);
@@ -26,7 +27,9 @@ export default function Feed() {
     } catch { if (p === 0) setItems([]); setMore(false); }
     setBusy(false);
   };
-  useEffect(() => { load(cat, 0); }, [cat]);
+  useEffect(() => { setOpen(false); load(cat, 0); }, [cat]);
+  const HALF = 12;
+  const shown = open ? items : items.slice(0, HALF);
 
   return (
     <section>
@@ -41,14 +44,16 @@ export default function Feed() {
         <div className="o-box o-note">{busy ? "読み込んでいます" : "このカテゴリの商品はまだありません。毎日ふえていきます。"}</div>
       ) : (
         <div className="o-pgrid">
-          {items.map((c) => <ProductCard key={c.pkey} c={c} />)}
+          {shown.map((c) => <ProductCard key={c.pkey} c={c} />)}
         </div>
       )}
-      {more && (
+      {!open && items.length > HALF ? (
+        <button className="o-btn block" style={{ marginTop: 10 }} onClick={() => setOpen(true)}>もっと見る(あと{items.length - HALF}件{more ? "以上" : ""})</button>
+      ) : more ? (
         <button className="o-btn block" style={{ marginTop: 10 }} disabled={busy} onClick={() => load(cat, page + 1)}>
-          {busy ? "読み込んでいます" : "もっと見る"}
+          {busy ? "読み込んでいます" : "さらに読み込む"}
         </button>
-      )}
+      ) : null}
     </section>
   );
 }
