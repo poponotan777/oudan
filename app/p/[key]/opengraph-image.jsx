@@ -2,7 +2,7 @@
 import { ImageResponse } from "next/og";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadProduct } from "../../../lib/catalog";
-import { STORE_ORDER, statsFor } from "../../../lib/priceView";
+import { STORE_ORDER, statsFor, trustedOffers } from "../../../lib/priceView";
 import { ProductOG, ogFonts, imageData, OG_SIZE, jstStamp } from "../../../lib/og";
 
 export const size = OG_SIZE;
@@ -19,7 +19,7 @@ export default async function Image({ params }) {
   const prices = {};
   let newest = null, best = null;
   for (const s of STORE_ORDER) {
-    const o = d?.offers?.[s];
+    const o = trustedOffers(d?.offers)[s];
     prices[s] = o?.price ?? null;
     if (o?.updated_at && (!newest || o.updated_at > newest)) newest = o.updated_at;
     if (o && (!best || o.price < best.price)) best = o;

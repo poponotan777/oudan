@@ -10,6 +10,7 @@
 // ============================================================
 
 import { isSameProduct, normalizeName } from "../lib/merge.js";
+import { janKey } from "../lib/unitPrice.js";
 import { BRANDS } from "./brands.js";
 import { Pacer, Writer, log, rpc, cleanText, cleanName, enrich, NOISE, isJan, shortQuery, pickSame, describe } from "./core.js";
 
@@ -120,7 +121,7 @@ export function amazonRow(it, extra = {}) {
       : /PRIME/.test(deal.accessType || "") ? "プライム限定" : "セール";
   }
   const row = {
-    pkey: extra.pkey || (jan || `a:${asin}`),
+    pkey: extra.pkey || (jan ? janKey(jan, name) : `a:${asin}`),
     store: "amazon",
     code: asin,
     name,
@@ -200,12 +201,12 @@ async function fill(pacer, writer, n) {
     }).filter(Boolean);
     const best = pickSame(cands, q.name, isSameProduct, { jan: q.jan });
     if (best) {
-      const target = !isJan(q.pkey) && best.jan ? best.jan : q.pkey;
+      const target = !isJan(q.pkey) && best.jan ? janKey(best.jan, best.name) : q.pkey;
       const asinKey = `a:${best.it.asin || best.it.ASIN}`;
       const row = amazonRow(best.it, {
         pkey: target,
         merge_from: target !== q.pkey ? [q.pkey] : undefined,
-        aliases: [best.jan, asinKey].filter((k, i, arr) => k && k !== target && arr.indexOf(k) === i),
+        aliases: [best.jan && janKey(best.jan, best.name), asinKey].filter((k, i, arr) => k && k !== target && arr.indexOf(k) === i),
       });
       if (row) { writer.add(row); found++; }
     }

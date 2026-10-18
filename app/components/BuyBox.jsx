@@ -1,7 +1,7 @@
 "use client";
 // 商品ページのいちばん上:どこで買うと安いか・いまは買い時か・すぐ買えるボタン
 //   煽らない:ここに出す数字は、オウダンが記録した値段とセールの予定からだけ作る
-import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay } from "../../lib/priceView";
+import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay, trustedOffers } from "../../lib/priceView";
 import { upcomingSales, daysUntil } from "../../lib/saleCalendar";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
@@ -17,7 +17,8 @@ export function verdict(st) {
   return { tone: "high", word: "いまは高め", why: `ふだんより${d.toFixed(0)}%高い値段です。値下がりを待つのがおすすめです。` };
 }
 
-export default function BuyBox({ offers, rates, name, onBuy }) {
+export default function BuyBox({ offers: raw, rates, name, onBuy }) {
+  const offers = trustedOffers(raw); // セット数違いの疑いがあるサイトは外す
   const list = STORE_ORDER.filter((s) => offers?.[s]?.price > 0).map((s) => ({ s, o: offers[s], eff: effectivePrice(s, offers[s], rates) }));
   if (!list.length) return null;
   const best = [...list].sort((a, b) => a.eff - b.eff)[0];
@@ -83,7 +84,7 @@ export default function BuyBox({ offers, rates, name, onBuy }) {
         {best.o.sale_until && <li className="hot">{best.o.sale_label || "セール"}は<b>{fmtTime(best.o.sale_until)}まで</b></li>}
         {live && <li className="hot">{STORE_META[live.store].short}で<b>{live.name}</b>開催中{live.end ? `(${fmtDay(live.end)}まで)` : ""}。エントリーを忘れずに</li>}
         {soon && v.tone !== "best" && v.tone !== "good" && (
-          <li>あと<b>{Math.max(1, daysUntil(soon.start, now))}日</b>で{STORE_META[soon.store].short}の{soon.name}。ポイント狙いなら待つのも手です</li>
+          <li>あと<b>{Math.max(1, daysUntil(soon.start, now))}日</b>で{soon.name.startsWith(STORE_META[soon.store].short) ? soon.name : `${STORE_META[soon.store].short}の${soon.name}`}。ポイント狙いなら待つのも手です</li>
         )}
       </ul>
     </div>

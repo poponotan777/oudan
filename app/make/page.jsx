@@ -127,6 +127,17 @@ function Maker() {
     return { ...p, tp: id, i: p.i.slice(0, max) };
   });
   const flash = (m) => { setMsg(m); setTimeout(() => setMsg(""), 2500); };
+  // すべて消して最初から(確認してから)
+  const clearAll = () => {
+    const n = d.i.length;
+    const ok = window.confirm(`入力した内容をすべて消して、最初からやり直しますか?\n\n・選んだ商品 ${n}件\n・タイトル・作った人の名前・おすすめポイント\n・商品ごとの名前・ひとこと・説明\n\n消した内容は元に戻せません。`);
+    if (!ok) return;
+    setD(EMPTY); setCode(""); setMeta({}); setMissing({}); setFound([]); setQ(""); setImgState("idle");
+    try { localStorage.removeItem(DRAFT); } catch {}
+    try { window.history.replaceState(null, "", "/make"); } catch {}
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    flash("すべて消しました。最初から作れます");
+  };
 
   // 商品を探す(オウダンのDBから)
   const search = async (e) => {
@@ -169,7 +180,12 @@ function Maker() {
 
   return (
     <main className="o-wrap o-main">
-      <h1 className="o-page-title">紹介画像を作る</h1>
+      <div className="o-make-top">
+        <h1 className="o-page-title">紹介画像を作る</h1>
+        {(d.i.length > 0 || d.t || d.s || d.by || d.p.some(Boolean)) && (
+          <button className="o-btn o-btn-danger small" onClick={clearAll}>すべてクリア</button>
+        )}
+      </div>
       <p className="o-lead">商品を選んで、ひとことや使い方を書くと、3サイトの値段が入った画像と紹介ページができます。ログインはいりません。</p>
 
       <h2 className="o-h2">1. テンプレート</h2>
@@ -312,10 +328,10 @@ function Maker() {
           </div>
         </>
       )}
-      <p style={{ marginTop: 16 }}>
-        <button className="o-link" style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13 }}
-          onClick={() => { if (window.confirm("いまの内容を消して、最初から作りますか?")) { setD(EMPTY); setCode(""); } }}>最初から作り直す</button>
-      </p>
+      <div className="o-box o-reset-box">
+        <p style={{ margin: 0 }}>選んだ商品・タイトル・ひとこと・説明をすべて消して、最初から作り直せます。</p>
+        <button className="o-btn o-btn-danger" onClick={clearAll}>すべて消して最初からやり直す</button>
+      </div>
     </main>
   );
 }

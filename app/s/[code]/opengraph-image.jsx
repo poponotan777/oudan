@@ -8,7 +8,8 @@ export const contentType = "image/png";
 export const revalidate = 3600;
 export const alt = "オウダンの紹介画像";
 
-const pricesOf = (it) => Object.fromEntries(["rakuten", "yahoo", "amazon"].map((s) => [s, it.offers[s]?.price ?? null]));
+import { trustedOffers } from "../../../lib/priceView";
+const pricesOf = (it) => { const t = trustedOffers(it.offers); return Object.fromEntries(["rakuten", "yahoo", "amazon"].map((s) => [s, t[s]?.price ?? null])); };
 
 export default async function Image({ params }) {
   const { code } = await params;

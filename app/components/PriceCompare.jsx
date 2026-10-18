@@ -8,7 +8,7 @@
 
 import {
   STORE_ORDER, STORE_META, yen, statsFor, statsLabel, effectivePrice, extraPointPct,
-  fmtTime, fmtDay, searchUrl,
+  fmtTime, fmtDay, searchUrl, lotSuspects, suspectText,
 } from "../../lib/priceView";
 
 const num = (n) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("ja-JP"));
@@ -16,6 +16,7 @@ const num = (n) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("ja
 // offers: 画面の店舗価格の配列(検索・DB由来が混ざってよい)/ dbOffers: {store: DBの行(hist付き)}
 export function buildRows({ offers = [], dbOffers = {} }) {
   const rows = {};
+  const tmp = {};
   for (const s of STORE_ORDER) {
     const live = offers.filter((o) => o.store === s && o.price > 0).sort((a, b) => a.price - b.price)[0] || null;
     const db = dbOffers?.[s] || null;
@@ -29,7 +30,11 @@ export function buildRows({ offers = [], dbOffers = {} }) {
       updated_at: base.fromDb ? (base.updated_at || db?.updated_at) : null,
       stats: statsFor(base.price, db),
     };
+    tmp[s] = rows[s];
   }
+  // セット数違いの疑い(いちばん安い・お得の計算から外す)
+  const sus = lotSuspects(tmp);
+  for (const [s, x] of sus) rows[s] = { ...rows[s], suspect: x };
   return rows;
 }
 
@@ -37,7 +42,7 @@ export function bestOf(rows, rates) {
   let best = null;
   for (const s of STORE_ORDER) {
     const o = rows[s];
-    if (!o) continue;
+    if (!o || o.suspect) continue;
     const e = effectivePrice(s, o, rates);
     if (e != null && (!best || e < best.eff)) best = { store: s, eff: e, o };
   }
@@ -59,8 +64,8 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
   const rows = buildRows({ offers, dbOffers });
   const best = bestOf(rows, rates);
   const order = [...STORE_ORDER].sort((a, b) => {
-    const ea = rows[a] ? effectivePrice(a, rows[a], rates) : Infinity;
-    const eb = rows[b] ? effectivePrice(b, rows[b], rates) : Infinity;
+    const ea = rows[a] ? effectivePrice(a, rows[a], rates) + (rows[a].suspect ? 1e9 : 0) : Infinity;
+    const eb = rows[b] ? effectivePrice(b, rows[b], rates) + (rows[b].suspect ? 1e9 : 0) : Infinity;
     return ea - eb;
   });
 
@@ -108,6 +113,7 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
                   </a>
                 )}
               </div>
+              {o.suspect && <div className="o-lot-warn">{suspectText(o.suspect)}。比較(いちばん安い・おトク額)からは外しています。</div>}
               <div className="o-cmp-marks">
                 {lab.tone === "none"
                   ? <span className="o-mark flat">{lab.main}</span>
@@ -144,7 +150,7 @@ export function MiniCompare({ offers, dbOffers, rates }) {
         const meta = STORE_META[s];
         const on = best && best.store === s;
         return (
-          <div key={s} className={on ? "best" : o ? "" : "none"}>
+          <div key={s} className={on ? "best" : o ? (o.suspect ? "none" : "") : "none"} title={o?.suspect ? suspectText(o.suspect) : undefined}>
             <div className={`s s-${s}`}>{meta.short}{on ? " 最安" : ""}</div>
             <div className="p o-num">{o ? `¥${num(o.price)}` : "—"}</div>
           </div>

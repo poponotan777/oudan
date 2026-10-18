@@ -10,6 +10,7 @@
 // ============================================================
 
 import { isSameProduct, normalizeName } from "../lib/merge.js";
+import { janKey } from "../lib/unitPrice.js";
 import { BRANDS } from "./brands.js";
 import {
   Pacer, Writer, log, rpc, getState, setState, cleanText, cleanName, enrich, jstToIso,
@@ -49,7 +50,7 @@ export function yahooSearchRow(h, extra = {}) {
   const onSale = def && def > price;
   const bonus = num(h.point?.lyLimitedBonusAmount) || num(h.point?.bonusAmount) || null;
   const row = {
-    pkey: extra.pkey || (jan || `y:${h.code}`),
+    pkey: extra.pkey || (jan ? janKey(jan, name) : `y:${h.code}`),
     store: "yahoo",
     code: h.code,
     name,
@@ -85,7 +86,7 @@ export function yahooRankRow(d, extra = {}) {
   if (!ii.code || !name || !(price > 0) || NOISE.test(rawName)) return null;
   const jan = isJan(ii.jan_code) ? ii.jan_code : null;
   const row = {
-    pkey: jan || `y:${ii.code}`,
+    pkey: jan ? janKey(jan, name) : `y:${ii.code}`,
     store: "yahoo",
     code: ii.code,
     name,
@@ -214,8 +215,8 @@ async function fill(pacer, writer, n) {
       const h = best.h;
       const hj = isJan(h.janCode) ? h.janCode : null;
       // JANが分かったら、JANを正式なキーにして元の商品をまとめる
-      const target = !isJan(q.pkey) && hj ? hj : q.pkey;
-      const natural = hj || `y:${h.code}`;
+      const target = !isJan(q.pkey) && hj ? janKey(hj, h.name) : q.pkey;
+      const natural = hj ? janKey(hj, h.name) : `y:${h.code}`;
       const row = yahooSearchRow(h, {
         pkey: target,
         merge_from: target !== q.pkey ? [q.pkey] : undefined,

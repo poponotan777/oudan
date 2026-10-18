@@ -8,6 +8,7 @@
 
 import { detectPains } from "../lib/pains.js";
 import { matchBrand } from "./brands.js";
+import { lotCompatible } from "../lib/unitPrice.js";
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -314,8 +315,9 @@ export function pickSame(candidates, targetName, isSameProduct, { jan = null, th
   const tb = matchBrand(targetName, "");
   const ok = candidates.filter((c) => {
     if (!c || !(c.price > 0)) return false;
-    if (jan && c.jan && c.jan === jan) return true;
-    if (jan && c.jan && c.jan !== jan) return false;   // JANが違えば別商品
+    // JANが同じでも、セット数が違えば別商品(1個と3個セットを比べない)
+    if (jan && c.jan && String(jan).startsWith(c.jan)) return lotCompatible(c.name, targetName);
+    if (jan && c.jan && !String(jan).startsWith(c.jan)) return false;   // JANが違えば別商品
     // 両方にブランド名があって違うなら別商品(「ソニー用ケース」と「ソニー」の誤結合を防ぐ)
     const cb = matchBrand(c.name, "");
     if (tb && cb && tb !== cb) return false;

@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadCatalog } from "../../../lib/catalog";
-import { STORE_ORDER, statsFor, statsLabel } from "../../../lib/priceView";
+import { STORE_ORDER, statsFor, statsLabel, lotSuspects } from "../../../lib/priceView";
 
 export const revalidate = 1800;
 const PER = 50;
@@ -21,9 +21,11 @@ export async function GET() {
     if (!e || !e.product) return null;
     const offers = {};
     let best = null;
+    const sus = lotSuspects(e.offers);
     for (const s of STORE_ORDER) {
       const o = e.offers[s];
       if (!o) continue;
+      if (sus.has(s)) { offers[s] = { price: o.price, point_rate: o.point_rate, sale_label: o.sale_label }; continue; }
       offers[s] = { price: o.price, point_rate: o.point_rate, sale_label: o.sale_label };
       if (!best || o.price < best.o.price) best = { s, o };
     }

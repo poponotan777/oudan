@@ -1,16 +1,17 @@
 "use client";
 // トップの「お得・急上昇・おすすめ」(v25)— タップで商品ページ(/p/…)へ
 import { useEffect, useState } from "react";
-import { productPath, STORE_ORDER, STORE_META, effectivePrice } from "../../lib/priceView";
+import { productPath, STORE_ORDER, STORE_META, effectivePrice, lotSuspects } from "../../lib/priceView";
 import Heart from "./Heart";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
 
 // 3サイトを縦に並べ、いちばん安い行に値札の色を付ける
 function Rows({ offers, rates }) {
-  const effs = STORE_ORDER.map((s) => (offers[s] ? effectivePrice(s, offers[s], rates) : null)).filter((v) => v != null);
+  const sus = lotSuspects(offers);
+  const effs = STORE_ORDER.map((s) => (offers[s] && !sus.has(s) ? effectivePrice(s, offers[s], rates) : null)).filter((v) => v != null);
   const best = effs.length ? Math.min(...effs) : null;
-  const bestS = STORE_ORDER.find((s) => offers[s] && effectivePrice(s, offers[s], rates) === best);
+  const bestS = STORE_ORDER.find((s) => offers[s] && !sus.has(s) && effectivePrice(s, offers[s], rates) === best);
   return (
     <div className="o-mini-rows">
       {STORE_ORDER.map((s) => {
@@ -19,7 +20,7 @@ function Rows({ offers, rates }) {
         return (
           <div key={s} className={on ? "best" : ""}>
             <span className={on ? "" : `s-${s}`} style={{ fontWeight: 900, fontSize: 11 }}>{STORE_META[s].short}</span>
-            <span className="o-num" style={{ color: o ? undefined : "var(--ink-3)" }}>{o ? `¥${num(o.price)}` : "—"}</span>
+            <span className="o-num" style={{ color: o && !sus.has(s) ? undefined : "var(--ink-3)" }} title={sus.has(s) ? "セット数が違う可能性があります" : undefined}>{o ? `¥${num(o.price)}${sus.has(s) ? "?" : ""}` : "—"}</span>
           </div>
         );
       })}
