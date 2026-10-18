@@ -34,15 +34,15 @@ function cheap(offers) {
 }
 
 const TABS = [
-  ["deal", "お得", "いつもの値段(90日の中央値)より安くなっているもの"],
-  ["trend", "急上昇", "ランキングで急に順位が上がったもの"],
-  ["recommend", "定番", "有名ブランドの人気商品で、評価が★4以上のもの"],
+  ["deal", "お得", "いつもの値段(90日の中央値)より安くなっているもの。楽天・Yahoo!・Amazonから50件ずつ、交互に並べています"],
+  ["trend", "急上昇", "各サイトのランキングで急に順位が上がったもの。3サイトから50件ずつ、交互に並べています"],
+  ["recommend", "定番", "各サイトの売れ筋上位で、評価が★4以上・レビュー30件以上のもの。3サイトから50件ずつ交互に"],
 ];
 
 export default function TopPicks({ rates }) {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("deal");
-  const [all, setAll] = useState(false);
+  const [shown, setShown] = useState(8);
   useEffect(() => {
     fetch("/api/top").then((r) => r.json()).then((d) => {
       setData(d);
@@ -50,15 +50,14 @@ export default function TopPicks({ rates }) {
     }).catch(() => setData({ deal: [], trend: [], recommend: [] }));
   }, []);
   const full = data?.[tab] || [];
-  const SHOW = 8;
-  const list = all ? full : full.slice(0, SHOW);
+  const list = full.slice(0, shown);
   const desc = TABS.find((t) => t[0] === tab)?.[2];
   return (
     <section>
       <h2 className="o-h2">いま見ておきたいもの</h2>
       <div className="o-row-scroll" role="tablist">
         {TABS.map(([k, label]) => (
-          <button key={k} role="tab" className="o-chip" aria-pressed={tab === k} onClick={() => { setTab(k); setAll(false); }}>
+          <button key={k} role="tab" className="o-chip" aria-pressed={tab === k} onClick={() => { setTab(k); setShown(8); }}>
             {label}{data?.[k]?.length ? <span className="o-num" style={{ marginLeft: 2 }}>{data[k].length}</span> : null}
           </button>
         ))}
@@ -88,10 +87,15 @@ export default function TopPicks({ rates }) {
           ))}
         </div>
       )}
-      {full.length > SHOW && (
-        <button className="o-btn block o-picks-more" onClick={() => setAll((v) => !v)}>
-          {all ? "閉じる" : `もっと見る(あと${full.length - SHOW}件)`}
-        </button>
+      {full.length > 8 && (
+        <div style={{ display: "flex", gap: 8 }} className="o-picks-more">
+          {shown < full.length && (
+            <button className="o-btn block" style={{ flex: 2 }} onClick={() => setShown((n) => Math.min(full.length, n + 24))}>
+              もっと見る(あと{full.length - shown}件)
+            </button>
+          )}
+          {shown > 8 && <button className="o-btn block" style={{ flex: 1 }} onClick={() => setShown(8)}>閉じる</button>}
+        </div>
       )}
     </section>
   );
