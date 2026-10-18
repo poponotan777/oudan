@@ -1,6 +1,7 @@
-// トップの「いま見ておきたいもの」(v28)
+// トップの「いま見ておきたいもの」(v28.2)
 //   お得・急上昇・定番の3つ。それぞれ 楽天・Yahoo!・Amazon から50件ずつ選び、交互に並べる(最大150件)
 //   (1つのサイトに偏らないように)。DB(自動取得の結果)だけを使い、30分ごとに作り直す
+//   50件に届かないサイトがあれば、条件を少しゆるめて足し、それでも足りなければほかのサイトで埋める
 import { NextResponse } from "next/server";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadCatalog } from "../../../lib/catalog";
@@ -8,34 +9,48 @@ import { STORE_ORDER, STORE_META, statsFor, statsLabel, lotSuspects } from "../.
 
 export const revalidate = 1800;
 const PER_STORE = 50;
+const WANT = 150; // 1サイトあたりの候補(ほかのサイトの穴埋めにも使う)
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
 
 // サイトごとの候補(商品キーの順番つき)
+//   ・Amazon はレビュー数がAPIで取れないため、定番は「売れ筋順位+有名ブランド」でも選ぶ
+//   ・お得は記録7日以上・8%以上安い → 足りなければ記録3日以上・5%以上安い
 async function candidates(sb, store) {
   const out = { deal: [], trend: [], recommend: [] };
-  // お得:90日で安い順位の値段(rank90 が小さい)から、中央値より8%以上安いものを、安くなった割合の大きい順に
-  {
-    const { data } = await sb.from("offers").select("pkey, price, median90, rank90")
-      .eq("store", store).gte("days", 7).gt("median90", 0).gte("price", 300).gte("updated_at", daysAgo(2))
-      .order("rank90", { ascending: true }).limit(400);
-    out.deal = (data || []).filter((o) => o.price <= o.median90 * 0.92)
+  const seen = { deal: new Set(), trend: new Set(), recommend: new Set() };
+  const push = (k, list) => {
+    for (const x of list) if (!seen[k].has(x.pkey) && out[k].length < WANT) { seen[k].add(x.pkey); out[k].push(x); }
+  };
+  // お得
+  for (const [minDays, ratio] of [[7, 0.92], [3, 0.95]]) {
+    if (out.deal.length >= WANT) break;
+    const { data } = await sb.from("offers").select("pkey, price, median90, rank90, days")
+      .eq("store", store).gte("days", minDays).gt("median90", 0).gte("price", 300).gte("updated_at", daysAgo(2))
+      .order("rank90", { ascending: true }).limit(1000);
+    push("deal", (data || []).filter((o) => o.price <= o.median90 * ratio)
       .map((o) => ({ pkey: o.pkey, score: (o.median90 - o.price) / o.median90 }))
-      .sort((a, b) => b.score - a.score).slice(0, PER_STORE * 2);
+      .sort((a, b) => b.score - a.score));
   }
-  // 急上昇:そのサイトのランキングで順位が上がったもの
+  // 急上昇
   {
     const { data } = await sb.from("offers").select("pkey, trend")
       .eq("store", store).gt("trend", 0).gte("updated_at", daysAgo(2))
-      .order("trend", { ascending: false }).limit(PER_STORE * 2);
-    out.trend = (data || []).map((o) => ({ pkey: o.pkey, score: o.trend }));
+      .order("trend", { ascending: false }).limit(WANT);
+    push("trend", (data || []).map((o) => ({ pkey: o.pkey, score: o.trend })));
   }
-  // 定番:そのサイトのランキング上位で、評価★4以上・レビュー30件以上(有名ブランドを優先)
+  // 定番:売れ筋上位で★4以上・レビュー30件以上 → 足りなければ売れ筋上位の有名ブランド
   {
-    const { data } = await sb.from("offers").select("pkey, rank, review_avg, review_count")
+    const { data } = await sb.from("offers").select("pkey, rank")
       .eq("store", store).not("rank", "is", null).gte("review_avg", 4).gte("review_count", 30).gte("updated_at", daysAgo(3))
-      .order("rank", { ascending: true }).limit(PER_STORE * 3);
-    out.recommend = (data || []).map((o) => ({ pkey: o.pkey, score: o.rank }));
+      .order("rank", { ascending: true }).limit(WANT);
+    push("recommend", (data || []).map((o) => ({ pkey: o.pkey, score: o.rank, rated: true })));
+  }
+  if (out.recommend.length < WANT) {
+    const { data } = await sb.from("offers").select("pkey, rank")
+      .eq("store", store).not("rank", "is", null).gte("updated_at", daysAgo(3))
+      .order("rank", { ascending: true }).limit(WANT * 2);
+    push("recommend", (data || []).map((o) => ({ pkey: o.pkey, score: o.rank, rated: false })));
   }
   return out;
 }
@@ -56,10 +71,11 @@ export async function GET() {
     for (const [k, v] of m) cat.set(k, v);
   }
 
-  const build = (pkey, kind, src) => {
+  const build = (pkey, kind, src, c = {}) => {
     const e = cat.get(pkey);
     if (!e || !e.product) return null;
-    if (kind === "recommend" && !e.product.is_brand && e.product.pop == null) return null;
+    // 定番でレビュー条件を使わなかったものは、有名ブランドだけ
+    if (kind === "recommend" && !c.rated && !e.product.is_brand) return null;
     const offers = {};
     let best = null;
     const sus = lotSuspects(e.offers);
@@ -74,6 +90,14 @@ export async function GET() {
     const focus = kind === "deal" && e.offers[src] && !sus.has(src) ? { s: src, o: e.offers[src] } : best;
     const st = statsFor(focus.o.price, focus.o);
     const lab = statsLabel(st);
+    const short = STORE_META[src].short;
+    let badge;
+    if (kind === "deal") {
+      badge = st && st.days < 7 && st.diffPct < 0
+        ? `${STORE_META[focus.s].short}でふだんより${Math.round(-st.diffPct)}%安い(記録${st.days}日)`
+        : `${STORE_META[focus.s].short}で${lab.main}`;
+    } else if (kind === "trend") badge = `${short}で順位が急上昇`;
+    else badge = `${short}の売れ筋`;
     return {
       pkey: e.pkey,
       name: e.product.name,
@@ -82,30 +106,28 @@ export async function GET() {
       offers,
       stores: Object.keys(offers).length,
       src,
-      badge: kind === "deal" ? `${STORE_META[focus.s].short}で${lab.main}` : kind === "trend" ? `${STORE_META[src].short}で順位が急上昇` : `${STORE_META[src].short}の売れ筋`,
+      badge,
       sub: st && st.days >= 7 ? lab.sub : "",
     };
   };
 
-  // サイトごとに50件ずつ作り、楽天→Yahoo!→Amazon の順に1件ずつ交互に並べる
+  // サイトごとに50件ずつ作り、楽天→Yahoo!→Amazon の順に1件ずつ交互に並べる。
+  // 50件に届かないサイトがあれば、ほかのサイトの51件目以降で埋めて、合計150件に近づける
   const pick = (kind) => {
-    const seen = new Set();
     const lists = STORE_ORDER.map((s, i) => {
       const l = [];
       for (const c of per[i][kind]) {
-        if (l.length >= PER_STORE) break;
-        const it = build(c.pkey, kind, s);
+        if (l.length >= WANT) break;
+        const it = build(c.pkey, kind, s, c);
         if (it && !l.some((x) => x.pkey === it.pkey)) l.push(it);
       }
       return l;
     });
+    const seen = new Set();
     const out = [];
-    for (let i = 0; i < PER_STORE; i++) {
-      for (const l of lists) {
-        const it = l[i];
-        if (it && !seen.has(it.pkey)) { seen.add(it.pkey); out.push(it); }
-      }
-    }
+    const take = (it) => { if (it && !seen.has(it.pkey) && out.length < PER_STORE * 3) { seen.add(it.pkey); out.push(it); } };
+    for (let i = 0; i < PER_STORE; i++) for (const l of lists) take(l[i]);
+    for (let i = PER_STORE; i < WANT; i++) for (const l of lists) take(l[i]);
     return out;
   };
 
