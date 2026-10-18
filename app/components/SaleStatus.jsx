@@ -46,7 +46,7 @@ export function TodayStrip({ status, sheetEvents, onEdit }) {
   );
 }
 
-export function SaleCalendarList({ sheetEvents, loaded, max = 5 }) {
+export function SaleCalendarList({ sheetEvents, loaded, max = 2 }) {
   const [all, setAll] = useState(false);
   if (!loaded) return null;
   const now = new Date();

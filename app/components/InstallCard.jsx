@@ -1,7 +1,7 @@
 "use client";
 // ホーム画面・デスクトップに追加する案内(端末ごとにやり方が違うので、出し分ける)
 import { useEffect, useState } from "react";
-import { installState, promptInstall, onInstallChange, initInstall } from "../../lib/install";
+import { installState, promptInstall, onInstallChange, initInstall, markInstallDone } from "../../lib/install";
 
 export default function InstallCard({ compact = false }) {
   const [st, setSt] = useState({ kind: "none" });
@@ -53,5 +53,8 @@ export default function InstallCard({ compact = false }) {
       </div>
     );
   }
-  return <div className="o-install">{icon}{body}</div>;
+  const close = (
+    <button className="o-install-close" aria-label="この案内を閉じる(もう出しません)" title="追加した・使わない場合は閉じてください" onClick={markInstallDone}>×</button>
+  );
+  return <div className="o-install">{icon}{body}{close}</div>;
 }

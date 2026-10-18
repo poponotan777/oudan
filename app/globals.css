@@ -6,8 +6,14 @@
 
 :root {
   --ink: #1f2350;        /* 藍:文字・ヘッダー */
-  --ink-2: #474a72;      /* 二番目の文字 */
-  --ink-3: #8486a3;      /* 補足 */
+  --ink-2: #3c3f66;      /* 二番目の文字 */
+  --ink-3: #4f5278;      /* 補足(薄くしすぎない) */
+  --brand: #1f2350;      /* ヘッダー・濃いボタンの地(ダークでも濃いまま) */
+  --brand-2: #2d3270;
+  --on-tag: #1f2350;     /* 黄色の上の文字 */
+  --head-sub: #e6e8ff;   /* ヘッダーの小さい文字 */
+  --shadow: 0 1px 0 rgba(31,35,80,.06), 0 6px 18px -10px rgba(31,35,80,.25);
+  --t-rakuten: #bf0000; --t-yahoo: #e60033; --t-amazon: #b35f00;
   --paper: #ffffff;
   --mist: #eef0f7;       /* 背景 */
   --line: #dfe2ee;
@@ -51,51 +57,51 @@ img { max-width: 100%; }
 .o-num { font-family: var(--num); font-weight: 700; letter-spacing: 0.01em; font-variant-numeric: tabular-nums; }
 
 /* ---------- ヘッダー ---------- */
-.o-header { background: var(--ink); color: #fff; position: sticky; top: 0; z-index: 20; }
+.o-header { background: linear-gradient(180deg, var(--brand) 0%, var(--brand-2) 100%); color: #fff; position: sticky; top: 0; z-index: 20; }
 .o-header-row { display: flex; align-items: center; gap: 12px; padding: 12px 0 10px; }
 .o-logo { display: flex; align-items: center; gap: 8px; text-decoration: none; color: #fff; background: none; border: none; padding: 0; cursor: pointer; }
 .o-logo-mark { width: 26px; height: 26px; }
 .o-logo-text { font-size: 19px; font-weight: 900; letter-spacing: 0.08em; }
 .o-nav { margin-left: auto; display: flex; gap: 2px; }
 .o-nav button {
-  background: none; border: none; color: #b9bce0; font-size: 13px; font-weight: 700;
+  background: none; border: none; color: var(--head-sub); font-size: 13px; font-weight: 700;
   padding: 7px 10px; border-radius: 999px; cursor: pointer;
 }
-.o-nav button[aria-current="page"] { background: #fff; color: var(--ink); }
+.o-nav button[aria-current="page"] { background: var(--paper); color: var(--ink); }
 .o-nav .o-badge-n { font-family: var(--num); font-size: 12px; margin-left: 3px; }
 .o-search { display: flex; gap: 8px; padding-bottom: 14px; }
 .o-search input {
   flex: 1; min-width: 0; border: none; border-radius: var(--radius-m); padding: 13px 16px;
-  font-size: 16px; font-family: inherit; color: var(--ink); background: #fff; outline: none;
+  font-size: 16px; font-family: inherit; color: var(--ink); background: var(--paper); outline: none;
 }
-.o-search input::placeholder { color: #9a9cb8; }
+.o-search input::placeholder { color: #6b6e92; }
 .o-search button {
-  border: none; border-radius: var(--radius-m); background: var(--tag); color: var(--ink);
+  border: none; border-radius: var(--radius-m); background: var(--tag); color: var(--on-tag);
   font-weight: 900; font-size: 15px; padding: 0 20px; cursor: pointer;
 }
 .o-search button:active { transform: translateY(1px); }
-.o-lede { font-size: 12px; color: #b9bce0; padding-bottom: 12px; margin: -6px 0 0; }
+.o-lede { font-size: 12px; color: var(--head-sub); padding-bottom: 12px; margin: -6px 0 0; }
 
 /* ---------- 共通 ---------- */
 main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-h2 { font-size: 17px; font-weight: 900; margin: 26px 0 10px; letter-spacing: 0.02em; }
 .o-h2 small { font-size: 12px; font-weight: 500; color: var(--ink-3); margin-left: 8px; }
 .o-box { background: var(--paper); border-radius: var(--radius-l); padding: 16px; }
-.o-note { font-size: 11.5px; color: var(--ink-3); line-height: 1.7; }
+.o-note { font-size: 12px; color: var(--ink-2); line-height: 1.7; }
 .o-link { color: var(--ink); font-weight: 700; text-decoration: underline; text-decoration-color: var(--tag-deep); text-underline-offset: 3px; }
 .o-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  border: 1.5px solid var(--ink); background: #fff; color: var(--ink); border-radius: 999px;
+  border: 1.5px solid var(--ink); background: var(--paper); color: var(--ink); border-radius: 999px;
   padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none;
 }
-.o-btn.solid { background: var(--ink); color: #fff; }
-.o-btn.tag { background: var(--tag); border-color: var(--tag); color: var(--ink); }
+.o-btn.solid { background: var(--brand); border-color: var(--brand); color: #fff; }
+.o-btn.tag { background: var(--tag); border-color: var(--tag); color: var(--on-tag); }
 .o-btn.block { width: 100%; padding: 12px; font-size: 14px; }
 .o-chip {
-  display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: #fff;
+  display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--line); background: var(--paper);
   color: var(--ink-2); border-radius: 999px; padding: 6px 13px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; text-decoration: none;
 }
-.o-chip[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.o-chip[aria-pressed="true"] { background: var(--brand); color: #fff; border-color: var(--brand); }
 .o-row-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
 .o-row-scroll::-webkit-scrollbar { display: none; }
 
@@ -115,7 +121,7 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 /* ---------- 値札(いちばん安い価格) ---------- */
 .o-pricetag {
   position: relative; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; max-width: 100%;
-  background: var(--tag); color: var(--ink); padding: 6px 14px 6px 26px;
+  background: var(--tag); color: var(--on-tag); padding: 6px 14px 6px 26px;
   clip-path: polygon(14px 0, 100% 0, 100% 100%, 14px 100%, 0 50%);
   border-radius: 0 8px 8px 0;
 }
@@ -129,24 +135,24 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-pricetag.small .o-num { font-size: 20px; }
 .o-pricetag.small { padding: 3px 10px 3px 22px; }
 .o-pricetag.small::before { left: 10px; width: 6px; height: 6px; margin-top: -3px; }
-.o-pricetag.on-white::before { background: #fff; }
+.o-pricetag.on-white::before { background: var(--paper); }
 
 /* ---------- カテゴリ(親→子) ---------- */
 .o-cats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 @media (min-width: 900px) { .o-cats { grid-template-columns: repeat(8, 1fr); } }
 .o-cat {
   display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px 10px;
-  background: #fff; border: 2px solid transparent; border-radius: var(--radius-m); cursor: pointer; color: var(--ink);
+  background: var(--paper); border: 2px solid transparent; border-radius: var(--radius-m); cursor: pointer; color: var(--ink);
 }
-.o-cat[aria-expanded="true"] { border-color: var(--ink); }
+.o-cat[aria-expanded="true"] { border-color: var(--tag-deep); }
 .o-cat-icon { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; }
 .o-cat-name { font-size: 12px; font-weight: 700; line-height: 1.25; text-align: center; }
-.o-subcats { background: #fff; border-radius: var(--radius-m); padding: 12px; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.o-subcats { background: var(--paper); border-radius: var(--radius-m); padding: 12px; margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 .o-subcats .o-chip { background: var(--mist); border-color: transparent; color: var(--ink); }
 
 /* ---------- 今日の還元率 ---------- */
 .o-rates { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.o-rate { background: #fff; border-radius: var(--radius-m); padding: 10px 12px; border-top: 4px solid var(--line); min-width: 0; }
+.o-rate { background: var(--paper); border-radius: var(--radius-m); padding: 10px 12px; border-top: 4px solid var(--line); min-width: 0; }
 .o-rate.rakuten { border-top-color: var(--rakuten); }
 .o-rate.yahoo { border-top-color: var(--yahoo); }
 .o-rate.amazon { border-top-color: var(--amazon-accent); }
@@ -162,13 +168,13 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (min-width: 900px) { .o-pgrid { grid-template-columns: repeat(4, 1fr); } }
 .o-item {
-  display: flex; gap: 12px; width: 100%; text-align: left; background: #fff; border: none;
+  display: flex; gap: 12px; width: 100%; text-align: left; background: var(--paper); border: none;
   border-radius: var(--radius-l); padding: 12px; cursor: pointer; color: var(--ink); position: relative;
 }
 .o-item-img { width: 92px; height: 92px; object-fit: contain; border-radius: var(--radius-m); background: var(--mist); flex-shrink: 0; }
 .o-item-name { font-size: 13.5px; font-weight: 700; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .o-item-sub { font-size: 11.5px; color: var(--ink-3); }
-.o-tile { display: block; background: #fff; border-radius: var(--radius-l); padding: 10px; text-decoration: none; color: var(--ink); position: relative; }
+.o-tile { display: block; background: var(--paper); border-radius: var(--radius-l); padding: 10px; text-decoration: none; color: var(--ink); position: relative; }
 .o-tile-img { width: 100%; height: 118px; object-fit: contain; border-radius: var(--radius-m); background: var(--mist); }
 .o-tile-name { font-size: 12.5px; font-weight: 700; line-height: 1.4; margin-top: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
@@ -177,11 +183,13 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-mini > div { border-radius: 7px; padding: 3px 6px; background: var(--mist); min-width: 0; }
 .o-mini .s { font-size: 10px; font-weight: 900; }
 .o-mini .p { font-size: 15px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.o-mini > div.best { background: var(--tag); }
-.o-mini > div.none .p { color: #b9bccd; }
+.o-mini > div.best { background: var(--tag); color: var(--on-tag); }
+.o-mini > div.none .p { color: var(--ink-3); }
 .o-mini-rows { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 .o-mini-rows > div { display: flex; align-items: center; font-size: 11.5px; padding: 1px 6px; border-radius: 6px; }
-.o-mini-rows > div.best { background: var(--tag); }
+.o-mini-rows > div.best { background: var(--tag); color: var(--on-tag); }
+.o-mini-rows > div.best .o-num, .o-mini-rows > div.best span { color: var(--on-tag) !important; }
+.o-mini > div.best .s, .o-mini > div.best .p { color: var(--on-tag) !important; }
 .o-mini-rows .o-num { margin-left: auto; font-size: 15px; }
 
 /* ハート(気になる) */
@@ -189,13 +197,14 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
   position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%;
   border: none; background: rgba(255,255,255,.92); display: grid; place-items: center; cursor: pointer; padding: 0;
 }
+.o-heart { color: #1f2350; }
 .o-heart svg { width: 19px; height: 19px; }
 .o-heart[aria-pressed="true"] svg path { fill: var(--shu); stroke: var(--shu); }
 
 /* ---------- 3サイト比較(詳細) ---------- */
 .o-cmp { display: flex; flex-direction: column; gap: 8px; }
-.o-cmp-row { background: #fff; border: 1.5px solid var(--line); border-radius: var(--radius-m); padding: 12px 14px; }
-.o-cmp-row.best { border-color: var(--ink); box-shadow: inset 6px 0 0 var(--tag); }
+.o-cmp-row { background: var(--paper); border: 1.5px solid var(--line); border-radius: var(--radius-m); padding: 12px 14px; }
+.o-cmp-row.best { border-color: var(--tag-deep); box-shadow: inset 6px 0 0 var(--tag); }
 .o-cmp-row.missing { border-style: dashed; background: transparent; }
 .o-cmp-top { display: flex; align-items: center; gap: 10px; }
 .o-cmp-price { font-size: 26px; line-height: 1.1; }
@@ -210,8 +219,8 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 
 /* ---------- セール ---------- */
 .o-sales { display: flex; flex-direction: column; gap: 8px; }
-.o-sale { display: block; text-decoration: none; background: #fff; border-radius: var(--radius-m); padding: 11px 14px; border-left: 5px solid var(--line); color: var(--ink); }
-.o-sale.today { border-left-color: var(--shu); background: #fff7f5; }
+.o-sale { display: block; text-decoration: none; background: var(--paper); border-radius: var(--radius-m); padding: 11px 14px; border-left: 5px solid var(--line); color: var(--ink); }
+.o-sale.today { border-left-color: var(--shu); background: var(--shu-soft); }
 .o-sale.tomorrow { border-left-color: #f08a1c; }
 .o-sale.live { border-left-color: var(--tag-deep); }
 .o-sale.soon { border-left-color: #8ea0d6; }
@@ -228,7 +237,7 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-form label.o-check input { margin-top: 4px; width: 17px; height: 17px; accent-color: var(--ink); }
 .o-form .o-check small { color: var(--ink-3); font-size: 11.5px; margin-left: 4px; }
 .o-form select, .o-form input[type="number"] {
-  border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; font-size: 16px; background: #fff; font-family: inherit; color: var(--ink);
+  border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 8px 10px; font-size: 16px; background: var(--paper); font-family: inherit; color: var(--ink);
 }
 .o-form .o-field { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0; font-size: 13.5px; }
 .o-spu { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
@@ -241,8 +250,8 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-footer a { color: var(--ink-2); margin: 0 8px; }
 
 /* ホーム画面に追加 */
-.o-install { display: flex; align-items: center; gap: 12px; background: var(--ink); color: #fff; border-radius: var(--radius-l); padding: 14px 16px; margin-top: 22px; }
-.o-install p { margin: 0; font-size: 12.5px; color: #c9cbe8; line-height: 1.5; }
+.o-install { display: flex; align-items: center; gap: 12px; background: var(--brand); color: #fff; border-radius: var(--radius-l); padding: 14px 16px; margin-top: 22px; }
+.o-install p { margin: 0; font-size: 12.5px; color: var(--head-sub); line-height: 1.5; }
 .o-install b { color: #fff; font-size: 14px; }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -259,8 +268,8 @@ main.o-main { padding-top: 18px; padding-bottom: 40px; }
 .o-btn[aria-pressed="true"] svg path, .o-heart-on svg path { fill: var(--shu); stroke: var(--shu); }
 
 /* ---------- v25 追加 ---------- */
-.o-nav a { color: #b9bce0; font-size: 13px; font-weight: 700; padding: 7px 10px; border-radius: 999px; text-decoration: none; }
-.o-nav a[aria-current="page"] { background: #fff; color: var(--ink); }
+.o-nav a { color: var(--head-sub); font-size: 13px; font-weight: 700; padding: 7px 10px; border-radius: 999px; text-decoration: none; }
+.o-nav a[aria-current="page"] { background: var(--paper); color: var(--ink); }
 .o-strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
 .o-strip::-webkit-scrollbar { display: none; }
 .o-strip > .o-tile { flex: 0 0 124px; }
@@ -289,7 +298,7 @@ button.o-tile { border: none; text-align: left; cursor: pointer; font-family: in
 .o-share-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .o-btn.x { background: #000; border-color: #000; color: #fff; }
 .o-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.o-toolbar select { margin-left: auto; border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 6px 8px; font-size: 13px; background: #fff; color: var(--ink); font-family: inherit; max-width: 190px; }
+.o-toolbar select { margin-left: auto; border: 1.5px solid var(--line); border-radius: var(--radius-s); padding: 6px 8px; font-size: 13px; background: var(--paper); color: var(--ink); font-family: inherit; max-width: 190px; }
 .o-count { font-size: 13px; color: var(--ink-2); }
 .o-count b { color: var(--ink); }
 .o-empty { text-align: center; padding: 36px 16px; }
@@ -309,9 +318,66 @@ button.o-tile { border: none; text-align: left; cursor: pointer; font-family: in
 .o-cat { transition: transform .12s ease; }
 .o-cat:active { transform: scale(.97); }
 .o-cat-icon { box-shadow: inset 0 -3px 0 rgba(31,35,80,.08); }
-.o-hero-cats { background: #fff; border-radius: var(--radius-l); padding: 14px 12px 12px; }
+.o-hero-cats { background: var(--paper); border-radius: var(--radius-l); padding: 14px 12px 12px; }
 .o-hero-cats .o-cat { background: transparent; padding: 8px 2px; }
 .o-hero-cats .o-cat[aria-expanded="true"] { background: var(--mist); border-color: transparent; }
 .o-hero-cats .o-subcats { background: var(--mist); margin-top: 6px; }
-.o-hero-cats .o-subcats .o-chip { background: #fff; }
+.o-hero-cats .o-subcats .o-chip { background: var(--paper); }
 .o-subcats .o-subcats-title { width: 100%; font-size: 12px; font-weight: 900; color: var(--ink-2); }
+
+/* ---------- v25.1 にぎやかさ・見やすさ ---------- */
+.s-rakuten { color: var(--t-rakuten); } .s-yahoo { color: var(--t-yahoo); } .s-amazon { color: var(--t-amazon); }
+.o-h2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.o-h2::before { content: ""; width: 6px; height: 18px; border-radius: 3px; background: var(--tag-deep); flex-shrink: 0; }
+.o-h2 small { color: var(--ink-2); margin-left: 0; }
+.o-tile, .o-item, .o-rate, .o-sale, .o-cmp-row, .o-box, .o-hero-cats, .o-cat { box-shadow: var(--shadow); }
+.o-hero-cats .o-cat { box-shadow: none; }
+.o-tile { border: 1px solid var(--line); }
+.o-item { border: 1px solid var(--line); }
+body { background: var(--mist) radial-gradient(1200px 380px at 50% -120px, var(--glow), transparent 70%) no-repeat; }
+:root { --glow: #dfe4ff; }
+.o-header { box-shadow: 0 2px 0 var(--tag-deep); }
+.o-picks-more { margin-top: 12px; }
+/* 横スライダー */
+.o-slider { position: relative; }
+.o-strip { scrollbar-width: thin; scrollbar-color: var(--ink-3) transparent; scroll-snap-type: x proximity; padding-bottom: 10px; }
+.o-strip::-webkit-scrollbar { display: block; height: 8px; }
+.o-strip::-webkit-scrollbar-thumb { background: var(--ink-3); border-radius: 4px; }
+.o-strip::-webkit-scrollbar-track { background: var(--line); border-radius: 4px; }
+.o-strip > .o-tile { flex: 0 0 158px; scroll-snap-align: start; }
+.o-strip .o-tile-img { height: 132px; }
+.o-strip .o-tile-name { font-size: 13px; }
+.o-strip .price { font-size: 18px; }
+.o-slide-btn {
+  position: absolute; top: 60px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); font-size: 20px; font-weight: 900; cursor: pointer; box-shadow: var(--shadow); z-index: 2;
+  display: none; align-items: center; justify-content: center; line-height: 1;
+}
+.o-slide-btn.prev { left: -10px; } .o-slide-btn.next { right: -10px; }
+@media (hover: hover) and (min-width: 700px) { .o-slide-btn { display: flex; } }
+.o-install { margin-top: 0; margin-bottom: 14px; }
+.o-install-close { background: none; border: none; color: var(--head-sub); font-size: 22px; cursor: pointer; padding: 0 2px; line-height: 1; align-self: flex-start; }
+
+/* ---------- ダークモード ---------- */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #eef0ff; --ink-2: #d2d5f2; --ink-3: #b3b7df;
+    --paper: #1d2142; --mist: #121530; --line: #353a68;
+    --brand: #15183a; --brand-2: #22266a;
+    --wakaba: #5fdc9f; --wakaba-soft: #143a2b;
+    --shu: #ff8a70; --shu-soft: #3e1f1a;
+    --t-rakuten: #ff6b6b; --t-yahoo: #ff6b8a; --t-amazon: #ffb340;
+    --glow: #242a66;
+    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 8px 20px -12px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+  .o-search input { background: #fff; color: #1f2350; }
+  .o-mark.bad { color: #ffd76a; background: #3b3010; }
+  .o-store.amazon, .o-cmp-buy.amazon { background: #3a4a60; }
+  .o-cat-icon { filter: saturate(1.1); }
+  .o-heart { background: rgba(255,255,255,.95); }
+  .o-chip[aria-pressed="true"], .o-nav button[aria-current="page"], .o-nav a[aria-current="page"] { background: var(--tag); color: var(--on-tag); border-color: var(--tag); }
+  .o-install { border: 1px solid var(--line); }
+  .o-btn.solid { background: var(--tag); border-color: var(--tag); color: var(--on-tag); }
+  img.o-tile-img, img.o-item-img, .o-detail-head img { background: #fff; }
+}

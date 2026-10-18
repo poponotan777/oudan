@@ -145,7 +145,7 @@ export function MiniCompare({ offers, dbOffers, rates }) {
         const on = best && best.store === s;
         return (
           <div key={s} className={on ? "best" : o ? "" : "none"}>
-            <div className="s" style={{ color: on ? "var(--ink)" : meta.color }}>{meta.short}{on ? " 最安" : ""}</div>
+            <div className={`s s-${s}`}>{meta.short}{on ? " 最安" : ""}</div>
             <div className="p o-num">{o ? `¥${num(o.price)}` : "—"}</div>
           </div>
         );

@@ -6,7 +6,7 @@
 //   気になる … ハートを押した商品(端末の中だけに保存。ログイン不要)
 //   設定  … あなたのポイント(還元率を自動計算)/各サイトのよく使うページ
 // ============================================================
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { searchRakutenClient } from "../lib/rakutenClient";
 import { mergeOffers } from "../lib/merge";
@@ -63,11 +63,16 @@ const STORE_LINKS = [
 // 小さな部品
 // ------------------------------------------------------------
 function Strip({ title, items, onOpen }) {
+  const ref = useRef(null);
   if (!items || items.length === 0) return null;
+  const go = (d) => ref.current?.scrollBy({ left: d * (ref.current.clientWidth * 0.8), behavior: "smooth" });
   return (
     <section>
       <h2 className="o-h2">{title}</h2>
-      <div className="o-strip">
+      <div className="o-slider">
+      <button className="o-slide-btn prev" aria-label="前へ" onClick={() => go(-1)}>‹</button>
+      <button className="o-slide-btn next" aria-label="次へ" onClick={() => go(1)}>›</button>
+      <div className="o-strip" ref={ref}>
         {items.map((it, i) => (
           <button key={(it.key || it.pkey || i) + "_" + i} className="o-tile" onClick={() => onOpen(it)}>
             {it.image ? <img className="o-tile-img" src={it.image} alt="" loading="lazy" /> : <div className="o-tile-img" />}
@@ -75,6 +80,7 @@ function Strip({ title, items, onOpen }) {
             {it.price != null && <div className="o-num price">¥{num(it.price)}</div>}
           </button>
         ))}
+      </div>
       </div>
     </section>
   );
@@ -99,7 +105,7 @@ function Categories({ onPick }) {
           {cur.kids.map((k) => (
             <button key={k} className="o-chip" onClick={() => onPick(k)}>{k}</button>
           ))}
-          <button className="o-chip" onClick={() => onPick(cur.name.split("・")[0])} style={{ background: "var(--ink)", color: "#fff" }}>{cur.name}をすべて</button>
+          <button className="o-chip" onClick={() => onPick(cur.name.split("・")[0])} style={{ background: "var(--brand)", color: "#fff", borderColor: "var(--brand)" }}>{cur.name}をすべて</button>
         </div>
       )}
     </section>
@@ -485,12 +491,13 @@ export default function Home() {
         {/* ===== ホーム ===== */}
         {view === "home" && !selected && (
           <>
+            <InstallCard />
             <Categories onPick={(k) => doSearch(k)} />
             <TodayStrip status={status} sheetEvents={saleEvents} onEdit={goSettings} />
-            <TopPicks rates={effRates} />
             <SaleCalendarList sheetEvents={saleEvents} loaded={saleLoaded} />
+            <TopPicks rates={effRates} />
             <Strip title="最近見た商品" items={viewHistory} onOpen={(it) => openFromList({ jan: it.key, name: it.name, image: it.image })} />
-            <InstallCard />
+            
           </>
         )}
 

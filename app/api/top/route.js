@@ -6,11 +6,11 @@ import { loadCatalog } from "../../../lib/catalog";
 import { STORE_ORDER, statsFor, statsLabel } from "../../../lib/priceView";
 
 export const revalidate = 1800;
-const PER = 12;
+const PER = 50;
 
 export async function GET() {
   const sb = publicDb();
-  const { data, error } = await sb.rpc("top_picks", { _n: 24 });
+  const { data, error } = await sb.rpc("top_picks", { _n: 60 });
   if (error) return NextResponse.json({ recommend: [], deal: [], trend: [], error: "not_ready" });
 
   const rows = data || [];

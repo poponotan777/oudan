@@ -10,15 +10,16 @@ const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
 function Rows({ offers, rates }) {
   const effs = STORE_ORDER.map((s) => (offers[s] ? effectivePrice(s, offers[s], rates) : null)).filter((v) => v != null);
   const best = effs.length ? Math.min(...effs) : null;
+  const bestS = STORE_ORDER.find((s) => offers[s] && effectivePrice(s, offers[s], rates) === best);
   return (
     <div className="o-mini-rows">
       {STORE_ORDER.map((s) => {
         const o = offers[s];
-        const on = o && effectivePrice(s, o, rates) === best;
+        const on = s === bestS;
         return (
           <div key={s} className={on ? "best" : ""}>
-            <span style={{ fontWeight: 900, color: on ? "var(--ink)" : STORE_META[s].color, fontSize: 11 }}>{STORE_META[s].short}</span>
-            <span className="o-num" style={{ color: o ? "var(--ink)" : "#b9bccd" }}>{o ? `¥${num(o.price)}` : "—"}</span>
+            <span className={on ? "" : `s-${s}`} style={{ fontWeight: 900, fontSize: 11 }}>{STORE_META[s].short}</span>
+            <span className="o-num" style={{ color: o ? undefined : "var(--ink-3)" }}>{o ? `¥${num(o.price)}` : "—"}</span>
           </div>
         );
       })}
@@ -40,25 +41,28 @@ const TABS = [
 export default function TopPicks({ rates }) {
   const [data, setData] = useState(null);
   const [tab, setTab] = useState("deal");
+  const [all, setAll] = useState(false);
   useEffect(() => {
     fetch("/api/top").then((r) => r.json()).then((d) => {
       setData(d);
       if (!(d.deal || []).length) setTab((d.trend || []).length ? "trend" : "recommend");
     }).catch(() => setData({ deal: [], trend: [], recommend: [] }));
   }, []);
-  const list = data?.[tab] || [];
+  const full = data?.[tab] || [];
+  const SHOW = 8;
+  const list = all ? full : full.slice(0, SHOW);
   const desc = TABS.find((t) => t[0] === tab)?.[2];
   return (
     <section>
       <h2 className="o-h2">いま見ておきたいもの</h2>
       <div className="o-row-scroll" role="tablist">
         {TABS.map(([k, label]) => (
-          <button key={k} role="tab" className="o-chip" aria-pressed={tab === k} onClick={() => setTab(k)}>
+          <button key={k} role="tab" className="o-chip" aria-pressed={tab === k} onClick={() => { setTab(k); setAll(false); }}>
             {label}{data?.[k]?.length ? <span className="o-num" style={{ marginLeft: 2 }}>{data[k].length}</span> : null}
           </button>
         ))}
       </div>
-      <p className="o-note" style={{ margin: "6px 0 10px" }}>{desc}</p>
+      <p className="o-note" style={{ margin: "6px 0 10px" }}>{desc}。黄色はポイント込みでいちばん安いサイトです。</p>
       {data === null ? (
         <p className="o-note">読み込んでいます</p>
       ) : list.length === 0 ? (
@@ -82,6 +86,11 @@ export default function TopPicks({ rates }) {
             </a>
           ))}
         </div>
+      )}
+      {full.length > SHOW && (
+        <button className="o-btn block o-picks-more" onClick={() => setAll((v) => !v)}>
+          {all ? "閉じる" : `もっと見る(あと${full.length - SHOW}件)`}
+        </button>
       )}
     </section>
   );
