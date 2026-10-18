@@ -14,8 +14,7 @@ import { BRANDS } from "./brands.js";
 import { RAKUTEN_FALLBACK_GENRES, RAKUTEN_SKIP_GENRE } from "./genres.js";
 import {
   Pacer, Writer, log, rpc, getState, setState, cleanText, cleanName, enrich, jstToIso,
-  NOISE, shortQuery, pickSame,
-} from "./core.js";
+  NOISE, shortQuery, pickSame, describe } from "./core.js";
 
 const RANK_URL = "https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601";
 const GENRE_URL = "https://openapi.rakuten.co.jp/ichibagt/api/IchibaGenre/Search/20260701";
@@ -81,7 +80,7 @@ export function rakutenRow(it, extra = {}) {
     sale_label: saleEnd ? "タイムセール" : pr && pr >= 2 ? `ポイント${pr}倍` : null,
     review_avg: Number(it.reviewAverage) || null,
     review_count: Number(it.reviewCount) || 0,
-    catch: cleanText(it.catchcopy, 120) || null,
+    catch: describe(it.catchcopy, it.itemCaption),
     genre: extra.genre || null,
   };
   if (extra.rank != null) { row.rank = extra.rank; row.rank_genre = extra.genre || null; }

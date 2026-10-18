@@ -1,22 +1,17 @@
 "use client";
 // ============================================================
-// 3サイト価格比較(v19)
+// 3サイト価格比較(v25)
 //   どこで価格を出すときも、楽天・Yahoo!・Amazon の3行を必ず出す。
-//   各行:今の価格/実質価格/90日の中央値との差/3か月で何番目に安いか/セール/購入ボタン
-//   見つかっていないサイトは「未取得」として、そのサイトで探すリンクを出す。
+//   いちばん安い(実質)サイトは値札で見せる。
+//   各行:今の価格/実質/90日の中央値との差/3か月で何番目/90日の最安とその日/セール/購入ボタン
 // ============================================================
 
 import {
   STORE_ORDER, STORE_META, yen, statsFor, statsLabel, effectivePrice, extraPointPct,
-  fmtTime, searchUrl,
+  fmtTime, fmtDay, searchUrl,
 } from "../../lib/priceView";
 
-const TONE = {
-  good: { color: "#065F46", bg: "#D1FAE5", border: "#10B981" },
-  bad: { color: "#92400E", bg: "#FEF3C7", border: "#F59E0B" },
-  flat: { color: "#334155", bg: "#F1F5F9", border: "#CBD5E1" },
-  none: { color: "#64748B", bg: "#F8FAFC", border: "#E2E8F0" },
-};
+const num = (n) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("ja-JP"));
 
 // offers: 画面の店舗価格の配列(検索・DB由来が混ざってよい)/ dbOffers: {store: DBの行(hist付き)}
 export function buildRows({ offers = [], dbOffers = {} }) {
@@ -38,10 +33,31 @@ export function buildRows({ offers = [], dbOffers = {} }) {
   return rows;
 }
 
-export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, compact = false, title = "3サイトの価格比較" }) {
+export function bestOf(rows, rates) {
+  let best = null;
+  for (const s of STORE_ORDER) {
+    const o = rows[s];
+    if (!o) continue;
+    const e = effectivePrice(s, o, rates);
+    if (e != null && (!best || e < best.eff)) best = { store: s, eff: e, o };
+  }
+  return best;
+}
+
+export function PriceTag({ price, store, eff, small = false, onWhite = false }) {
+  const withPoints = eff != null && Math.round(eff) < Math.round(price);
+  return (
+    <span className={`o-pricetag${small ? " small" : ""}${onWhite ? " on-white" : ""}`}>
+      <span className="who">{withPoints ? `ポイント込みなら${STORE_META[store]?.short}がいちばん安い` : `${STORE_META[store]?.short}がいちばん安い`}</span>
+      <span><span className="yen">¥</span><span className="o-num">{num(withPoints ? eff : price)}</span></span>
+      {withPoints && <span className="who" style={{ fontWeight: 700 }}>価格¥{num(price)}</span>}
+    </span>
+  );
+}
+
+export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, title = "3サイトの値段" }) {
   const rows = buildRows({ offers, dbOffers });
-  const effs = STORE_ORDER.map((s) => (rows[s] ? effectivePrice(s, rows[s], rates) : null));
-  const bestEff = Math.min(...effs.filter((e) => e != null));
+  const best = bestOf(rows, rates);
   const order = [...STORE_ORDER].sort((a, b) => {
     const ea = rows[a] ? effectivePrice(a, rows[a], rates) : Infinity;
     const eb = rows[b] ? effectivePrice(b, rows[b], rates) : Infinity;
@@ -49,100 +65,88 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, com
   });
 
   return (
-    <div>
-      {title && <h3 style={{ fontSize: 14, fontWeight: 800, color: "#16324F", margin: "18px 0 10px" }}>{title}</h3>}
-      {order.map((s) => {
-        const meta = STORE_META[s];
-        const o = rows[s];
-        if (!o) {
+    <section>
+      {title && <h3 className="o-h2" style={{ marginTop: 20 }}>{title}</h3>}
+      {best && <div style={{ marginBottom: 10 }}><PriceTag price={best.o.price} store={best.store} eff={best.eff} onWhite /></div>}
+      <div className="o-cmp">
+        {order.map((s) => {
+          const meta = STORE_META[s];
+          const o = rows[s];
+          if (!o) {
+            return (
+              <div key={s} className="o-cmp-row missing">
+                <div className="o-cmp-top">
+                  <span className={`o-store ${s}`}>{meta.short}</span>
+                  <span className="o-cmp-meta">まだ見つかっていません。次の自動取得で探します</span>
+                  <a className="o-cmp-buy ghost" href={searchUrl(s, name)} target="_blank" rel="noopener noreferrer sponsored">{meta.short}で探す</a>
+                </div>
+              </div>
+            );
+          }
+          const eff = effectivePrice(s, o, rates);
+          const isBest = best && best.store === s;
+          const lab = statsLabel(o.stats);
+          const extra = extraPointPct(s, o);
+          const st = o.stats;
           return (
-            <div key={s} style={{ display: "flex", alignItems: "center", gap: 10, padding: compact ? "8px 10px" : "11px 14px", borderRadius: 12, marginBottom: 8, border: "1px dashed #CBD5E1", background: "#FAFAFA" }}>
-              <div style={{ width: 64, fontSize: 12.5, fontWeight: 800, color: meta.color }}>{meta.short}</div>
-              <div style={{ flex: 1, fontSize: 11.5, color: "#94A3B8" }}>この商品はまだ見つかっていません(次回の自動取得で探します)</div>
-              <a href={searchUrl(s, name)} target="_blank" rel="noopener noreferrer sponsored"
-                style={{ fontSize: 11.5, fontWeight: 700, color: meta.color, border: `1px solid ${meta.color}`, borderRadius: 8, padding: "7px 10px", textDecoration: "none", whiteSpace: "nowrap" }}>
-                {meta.short}で探す
-              </a>
+            <div key={s} className={`o-cmp-row${isBest ? " best" : ""}`}>
+              <div className="o-cmp-top">
+                <div style={{ minWidth: 0 }}>
+                  <span className={`o-store ${s}`}>{meta.short}</span>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginTop: 3 }}>
+                    <span className="o-num o-cmp-price">¥{num(o.price)}</span>
+                    {eff !== o.price && <span className="o-cmp-eff">実質 ¥{num(eff)}</span>}
+                    {extra > 0 && <span className="o-mark hot">+{Math.round(extra * 10) / 10}%還元</span>}
+                  </div>
+                  <div className="o-cmp-meta">
+                    {[o.shop, o.updated_at ? `${fmtTime(o.updated_at)}の価格` : "いまの価格"].filter(Boolean).join("/")}
+                  </div>
+                </div>
+                {o.url && (
+                  <a className={`o-cmp-buy ${s}`} href={o.url} target="_blank" rel="noopener noreferrer sponsored" onClick={() => onBuy?.(s, o)}>
+                    {meta.short}で見る
+                  </a>
+                )}
+              </div>
+              <div className="o-cmp-marks">
+                {lab.tone === "none"
+                  ? <span className="o-mark flat">{lab.main}</span>
+                  : <span className={`o-mark ${lab.tone === "good" ? "good" : lab.tone === "bad" ? "bad" : "flat"}`}>{lab.main}</span>}
+                {lab.sub && <span className={`o-mark ${st?.isLowest ? "good" : "flat"}`}>{lab.sub}</span>}
+                {st && st.days >= 7 && (
+                  <span className="o-cmp-meta">
+                    90日の最安 ¥{num(st.min)}{st.minDay ? `(${fmtDay(st.minDay)})` : ""}/ふだん ¥{num(st.median)}
+                  </span>
+                )}
+                {o.sale_label && (
+                  <span className="o-mark hot">{o.sale_label}{o.sale_until ? ` ${fmtTime(o.sale_until)}まで` : ""}</span>
+                )}
+              </div>
             </div>
           );
-        }
-        const eff = effectivePrice(s, o, rates);
-        const isBest = eff === bestEff;
-        const lab = statsLabel(o.stats);
-        const tone = TONE[lab.tone];
-        const extra = extraPointPct(s, o);
-        return (
-          <div key={s} style={{ padding: compact ? "9px 10px" : "12px 14px", borderRadius: 12, marginBottom: 8, border: isBest ? `1.5px solid ${meta.color}` : "1px solid #E2E8F0", background: isBest ? "#F0FDF6" : "#fff" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 64 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: meta.color }}>{meta.short}</div>
-                {isBest && <span style={{ fontSize: 9.5, fontWeight: 800, color: "#fff", background: meta.color, borderRadius: 3, padding: "1px 5px" }}>実質最安</span>}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: compact ? 16 : 19, fontWeight: 800 }}>{yen(o.price)}</span>
-                  <span style={{ fontSize: 11, color: "#059669", fontWeight: 700 }}>実質 {yen(eff)}</span>
-                  {extra > 0 && <span style={{ fontSize: 10, color: "#B45309", fontWeight: 800 }}>+{Math.round(extra * 10) / 10}%還元</span>}
-                </div>
-                <div style={{ fontSize: 10.5, color: "#64748B", marginTop: 1 }}>
-                  {o.shop ? `${o.shop}` : ""}{o.updated_at ? ` ・ ${fmtTime(o.updated_at)}時点` : " ・ 今の価格"}
-                </div>
-              </div>
-              {o.url ? (
-                <a href={o.url} target="_blank" rel="noopener noreferrer sponsored"
-                  onClick={() => onBuy?.(s, o)}
-                  style={{ fontSize: 12, fontWeight: 700, color: "#fff", background: meta.color, borderRadius: 8, padding: "9px 12px", textDecoration: "none", whiteSpace: "nowrap" }}>
-                  {meta.short}で見る
-                </a>
-              ) : null}
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 7 }}>
-              <span style={{ fontSize: 10.5, fontWeight: 800, color: tone.color, background: tone.bg, border: `1px solid ${tone.border}`, borderRadius: 5, padding: "2px 7px" }}>
-                {lab.tone === "good" ? "📉 " : lab.tone === "bad" ? "📈 " : ""}{lab.main}
-              </span>
-              {lab.sub && (
-                <span style={{ fontSize: 10.5, fontWeight: 700, color: o.stats?.isLowest ? "#065F46" : "#334155", background: o.stats?.isLowest ? "#D1FAE5" : "#F1F5F9", borderRadius: 5, padding: "2px 7px" }}>
-                  {o.stats?.isLowest ? "🏆 " : ""}{lab.sub}
-                </span>
-              )}
-              {o.stats && o.stats.days >= 7 && (
-                <span style={{ fontSize: 10, color: "#64748B", padding: "2px 2px" }}>
-                  中央値 {yen(o.stats.median)} / 最安 {yen(o.stats.min)}(記録{o.stats.days}日)
-                </span>
-              )}
-              {o.sale_label && (
-                <span style={{ fontSize: 10.5, fontWeight: 800, color: "#B91C1C", background: "#FEE2E2", borderRadius: 5, padding: "2px 7px" }}>
-                  ⚡{o.sale_label}{o.sale_until ? ` 〜${fmtTime(o.sale_until)}` : ""}
-                </span>
-              )}
-            </div>
-          </div>
-        );
-      })}
-      <p style={{ fontSize: 10, color: "#94A3B8", margin: "4px 0 0", lineHeight: 1.6 }}>
-        【PR】購入リンクはアフィリエイトリンクです。中央値・順位は、オウダンが1日2回記録した各サイトの価格(日ごとの最安)から計算した目安です。
-        価格・ポイントは取得時点のもので、変わることがあります。実際の価格は各サイトでご確認ください。
+        })}
+      </div>
+      <p className="o-note" style={{ marginTop: 8 }}>
+        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
       </p>
-    </div>
+    </section>
   );
 }
 
 // 検索結果カードなどに出す小さな3サイト表示
 export function MiniCompare({ offers, dbOffers, rates }) {
   const rows = buildRows({ offers, dbOffers });
-  const effs = STORE_ORDER.map((s) => (rows[s] ? effectivePrice(s, rows[s], rates) : null)).filter((e) => e != null);
-  const bestEff = effs.length ? Math.min(...effs) : null;
+  const best = bestOf(rows, rates);
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4, marginTop: 6 }}>
+    <div className="o-mini">
       {STORE_ORDER.map((s) => {
         const o = rows[s];
         const meta = STORE_META[s];
-        const eff = o ? effectivePrice(s, o, rates) : null;
-        const best = eff != null && eff === bestEff;
+        const on = best && best.store === s;
         return (
-          <div key={s} style={{ border: best ? `1.5px solid ${meta.color}` : "1px solid #E2E8F0", borderRadius: 7, padding: "3px 5px", background: best ? "#F0FDF6" : "#fff", minWidth: 0 }}>
-            <div style={{ fontSize: 9.5, fontWeight: 800, color: meta.color }}>{meta.short}{best ? " 最安" : ""}</div>
-            <div style={{ fontSize: 12, fontWeight: 800, color: o ? "#16324F" : "#CBD5E1", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{o ? yen(o.price) : "—"}</div>
+          <div key={s} className={on ? "best" : o ? "" : "none"}>
+            <div className="s" style={{ color: on ? "var(--ink)" : meta.color }}>{meta.short}{on ? " 最安" : ""}</div>
+            <div className="p o-num">{o ? `¥${num(o.price)}` : "—"}</div>
           </div>
         );
       })}

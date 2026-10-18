@@ -245,6 +245,28 @@ export function cleanName(s, max = 200) {
     .slice(0, max) || cleanText(s, max);
 }
 
+// 商品の説明(サイトに出す短い文)。キャッチコピーが販促の言葉だけなら、商品説明の最初の文を使う
+const PROMO_ONLY = /^(送料無料|正規品|あす楽|即納|公式|ポイント\d*倍|クーポン|楽天\d*位|ランキング|レビュー|SALE|セール|在庫限り|限定|新品|国内正規品|\s|[!！・,、。/／|｜\-])+$/;
+const NOISE_SENT = /送料|発送|返品|お届け|注意|※|クーポン|ポイント|ランキング|レビュー|メール便|ご注文|ご了承|お問い合わせ|在庫|納期|配送|ラッピング|のし|JAN|型番|品番|商品コード|お支払い|保証書/;
+export function describe(catchcopy, text, max = 120) {
+  const clean = (x) => cleanText(x, 600)
+    .replace(/【[^】]*】|［[^］]*］|\[[^\]]*\]|＼[^／]*／|★[^★]*★|◆[^◆]*◆|■|●|◎|☆|♪/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\s+/g, " ").trim();
+  const c = clean(catchcopy);
+  if (c.length >= 12 && !PROMO_ONLY.test(c) && !NOISE_SENT.test(c)) return c.slice(0, max);
+  const sents = clean(text).split(/(?<=[。！!？?])|\s{2,}|\n/)
+    .map((x) => x.replace(/^(商品(説明|詳細|紹介|情報|特徴)|特徴|概要|説明)[:：\s]*/, "").trim()).filter(Boolean);
+  let out = "";
+  for (const t of sents) {
+    if (t.length < 10 || NOISE_SENT.test(t) || /^[\d\s:：x×*\-~〜.,]+$/.test(t)) continue;
+    if (out && (out + t).length > max) break;
+    out += t;
+    if (out.length >= 40) break;
+  }
+  return (out || (c.length >= 8 && !PROMO_ONLY.test(c) ? c : "")).slice(0, max) || null;
+}
+
 // 商品名・説明から「有名ブランド」と「悩みタグ」を付ける
 export function enrich(row, { name, brandField, catchcopy, text }) {
   const b = matchBrand(name, brandField);
@@ -252,7 +274,7 @@ export function enrich(row, { name, brandField, catchcopy, text }) {
     row.is_brand = true;
     if (!row.brand) row.brand = b;
   }
-  const tags = detectPains({ name, catch: catchcopy, text });
+  const tags = detectPains({ name, catch: catchcopy, text, genre: row.genre || row.rank_genre || "" });
   if (tags.length) row.tags = tags;
   return row;
 }

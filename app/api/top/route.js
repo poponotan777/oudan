@@ -39,7 +39,7 @@ export async function GET() {
       brand: e.product.brand,
       offers,
       stores: Object.keys(offers).length,
-      badge: r.kind === "deal" ? `${focus.s === "rakuten" ? "楽天" : focus.s === "yahoo" ? "Yahoo!" : "Amazon"}で${lab.main}` : r.kind === "trend" ? "🚀 急上昇" : (lab.tone === "good" ? lab.main : "人気"),
+      badge: r.kind === "deal" ? `${focus.s === "rakuten" ? "楽天" : focus.s === "yahoo" ? "Yahoo!" : "Amazon"}で${lab.main}` : r.kind === "trend" ? "順位が急上昇" : (lab.tone === "good" ? lab.main : "人気"),
       sub: st && st.days >= 7 ? lab.sub : "",
       score: Number(r.score),
     };

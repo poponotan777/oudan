@@ -9,7 +9,7 @@ import { notFound } from "next/navigation";
 import { COLLECTIONS_ON } from "../../../lib/featureFlags";
 import { loadCollection } from "../../../lib/collectionData";
 import { STORE_ORDER, STORE_META, yen, fmtTime, productPath, statsFor, statsLabel } from "../../../lib/priceView";
-import { PAIN_BY_KEY } from "../../../lib/pains";
+import { painsForProduct } from "../../../lib/pains";
 import { SITE } from "../../../lib/supabaseServer";
 
 export const revalidate = 600;
@@ -81,7 +81,7 @@ function PriceTable({ it }) {
 
 function ItemCard({ it, i, template }) {
   const medal = ["#E3A008", "#9CA3AF", "#B7791F"];
-  const tags = (it.tags || []).map((t) => PAIN_BY_KEY[t]).filter(Boolean).slice(0, 2);
+  const tags = painsForProduct(it, 2);
   return (
     <article style={{ background: "#fff", border: "1px solid #DDE9E4", borderRadius: 16, padding: 16, marginBottom: 14 }}>
       <div style={{ display: "flex", gap: 14 }}>

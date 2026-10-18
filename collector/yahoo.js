@@ -13,8 +13,7 @@ import { isSameProduct, normalizeName } from "../lib/merge.js";
 import { BRANDS } from "./brands.js";
 import {
   Pacer, Writer, log, rpc, getState, setState, cleanText, cleanName, enrich, jstToIso,
-  NOISE, isJan, shortQuery, pickSame,
-} from "./core.js";
+  NOISE, isJan, shortQuery, pickSame, describe } from "./core.js";
 
 const BASE = "https://shopping.yahooapis.jp/ShoppingWebService";
 const RANK_URL = `${BASE}/V1/highRatingTrendRanking`;
@@ -67,7 +66,7 @@ export function yahooSearchRow(h, extra = {}) {
     review_count: num(h.review?.count) || 0,
     brand: h.brand?.name ? cleanText(h.brand.name, 60) : null,
     genre: h.genreCategory?.name || extra.genre || null,
-    catch: cleanText(h.headLine, 120) || null,
+    catch: describe(h.headLine, h.description),
   };
   if (extra.trend_hint) row.trend_hint = extra.trend_hint;
   if (extra.aliases && extra.aliases.length) row.aliases = extra.aliases;

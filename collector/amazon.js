@@ -11,7 +11,7 @@
 
 import { isSameProduct, normalizeName } from "../lib/merge.js";
 import { BRANDS } from "./brands.js";
-import { Pacer, Writer, log, rpc, cleanText, cleanName, enrich, NOISE, isJan, shortQuery, pickSame } from "./core.js";
+import { Pacer, Writer, log, rpc, cleanText, cleanName, enrich, NOISE, isJan, shortQuery, pickSame, describe } from "./core.js";
 
 const API = "https://creatorsapi.amazon/catalog/v1";
 const MARKETPLACE = "www.amazon.co.jp";
@@ -134,7 +134,7 @@ export function amazonRow(it, extra = {}) {
     point_rate: pts > 0 ? Math.round((pts / price) * 1000) / 10 : null,
     sale_until: deal?.endTime || null,
     sale_label: label,
-    catch: cleanText(features[0], 120) || null,
+    catch: describe(features[0], features.slice(1).join("。")),
   };
   if (rankNode.salesRank) {
     row.rank = Number(rankNode.salesRank);
