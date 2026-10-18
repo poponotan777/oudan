@@ -292,6 +292,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [rawOffers, setRawOffers] = useState([]);
+  const [dbProducts, setDbProducts] = useState([]); // オウダンのDBから見つかった商品(v29)
   const [searchPage, setSearchPage] = useState(1);
   const [mallFilter, setMallFilter] = useState("all");
   const [ratingFilter, setRatingFilter] = useState(false);
@@ -365,6 +366,13 @@ export default function Home() {
     } catch {}
   };
 
+  // DBの商品を先に、APIで見つかった商品をその後ろに(同じ商品は1つに)
+  const withDb = (dbItems, apiProducts) => {
+    const dbKeys = new Set(dbItems.flatMap((p) => [p.pkey, p.jan].filter(Boolean)));
+    const rest = apiProducts.filter((p) => !dbKeys.has(p.key) && !dbKeys.has(p.jan)).map((p) => ({ ...p, seq: (p.seq ?? 0) + 1000 }));
+    return [...dbItems, ...rest];
+  };
+
   const doSearch = async (q, sortOverride) => {
     const kw = (q ?? query).trim();
     if (!kw) return;
@@ -383,6 +391,18 @@ export default function Home() {
     try {
       const floor = getJunkFloor(kw);
       const ceil = useSort === "high" ? HIGH_SORT_MAX : null;
+      // v29:まずオウダンのDBから探す。売れている順で24件以上あれば、楽天・Yahoo!のAPIは使わない
+      //      (「もっと見る」を押したら、APIで続きを探す)
+      const dbRes = await fetch(`/api/dbsearch?q=${encodeURIComponent(kw.replace(/\s+/g, " "))}`).then((r) => r.json()).catch(() => ({ items: [] }));
+      const dbItems = dbRes.items || [];
+      setDbProducts(dbItems);
+      if (useSort === "popular" && dbItems.length >= 24) {
+        setRawOffers([]);
+        setSearchPage(0);
+        setResults({ query: kw, products: dbItems, sortKey: useSort, fromDb: true });
+        setLoading(false);
+        return;
+      }
       const [yahooRes, rakutenOffers, amazonRes] = await Promise.all([
         fetch(`/api/search?q=${encodeURIComponent(kw)}&sort=${useSort}&min=${floor}${ceil ? `&max=${ceil}` : ""}`).then((r) => r.json()).catch(() => ({ offers: [] })),
         searchRakutenClient(kw, 30, 1, RAKUTEN_SORT[useSort] || "standard", floor, ceil),
@@ -396,7 +416,7 @@ export default function Home() {
       const aOffers = (amazonRes.items || []).map((o, i) => ({ ...o, seq: 100000 + i }));
       const all = [...yOffers, ...rOffers, ...aOffers];
       setRawOffers(all);
-      const products = mergeOffers(all).slice(0, 500);
+      const products = withDb(dbItems, mergeOffers(all)).slice(0, 500);
       setResults({ query: kw, products, sortKey: useSort });
       recordOnSearch(products);
     } catch {
@@ -424,7 +444,7 @@ export default function Home() {
       ];
       setRawOffers(all);
       setSearchPage(next);
-      const products = mergeOffers(all).slice(0, 500);
+      const products = withDb(dbProducts, mergeOffers(all)).slice(0, 500);
       setResults({ query: results.query, products, sortKey: sort });
       recordOnSearch(products);
     } catch {}
@@ -552,6 +572,9 @@ export default function Home() {
                   <option value="rating">評価が高い順</option>
                 </select>
               </div>
+              {results.fromDb && searchPage === 0 && (
+                <p className="o-note" style={{ margin: "0 0 8px" }}>オウダンが毎日記録している商品から表示しています(3サイトの値段つき)。「もっと見る」で各サイトからも探します。</p>
+              )}
               <div className="o-row-scroll" style={{ marginBottom: 12 }}>
                 {[["all", "すべて"], ["rakuten", "楽天"], ["yahoo", "Yahoo!"], ["amazon", "Amazon"]].map(([k, label]) => (
                   <button key={k} className="o-chip" aria-pressed={mallFilter === k} onClick={() => setMallFilter(k)}>{label}</button>
