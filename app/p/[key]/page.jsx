@@ -8,6 +8,7 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import { publicDb, SITE, ensureAffiliate } from "../../../lib/supabaseServer";
 import { loadProduct, loadRelated } from "../../../lib/catalog";
+import { cardsFor } from "../../../lib/cards";
 import { STORE_ORDER, STORE_META, statsFor, statsLabel, yen, fmtTime, productPath } from "../../../lib/priceView";
 import ProductView from "./ProductView";
 
@@ -70,7 +71,8 @@ export default async function ProductPage({ params }) {
   const d = await getData(key);
   if (!d) notFound();
   if (d.redirectTo) permanentRedirect(productPath(d.redirectTo));
-  const related = await loadRelated(publicDb(), d.product, 8).catch(() => []);
+  const rel = await loadRelated(publicDb(), d.product, 24).catch(() => []);
+  const related = rel.length ? await cardsFor(publicDb(), rel.map((r) => r.pkey)).catch(() => []) : [];
 
   // 検索エンジン向けの商品情報(構造化データ)
   const prices = STORE_ORDER.map((s) => d.offers[s]?.price).filter((v) => v > 0);

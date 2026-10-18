@@ -55,7 +55,7 @@ export function PriceTag({ price, store, eff, small = false, onWhite = false }) 
   );
 }
 
-export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, title = "3サイトの値段" }) {
+export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, title = "3サイトの値段", showTag = true, note = true }) {
   const rows = buildRows({ offers, dbOffers });
   const best = bestOf(rows, rates);
   const order = [...STORE_ORDER].sort((a, b) => {
@@ -67,7 +67,7 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
   return (
     <section>
       {title && <h3 className="o-h2" style={{ marginTop: 20 }}>{title}</h3>}
-      {best && <div style={{ marginBottom: 10 }}><PriceTag price={best.o.price} store={best.store} eff={best.eff} onWhite /></div>}
+      {showTag && best && <div style={{ marginBottom: 10 }}><PriceTag price={best.o.price} store={best.store} eff={best.eff} onWhite /></div>}
       <div className="o-cmp">
         {order.map((s) => {
           const meta = STORE_META[s];
@@ -126,9 +126,9 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
           );
         })}
       </div>
-      <p className="o-note" style={{ marginTop: 8 }}>
+      {note && <p className="o-note" style={{ marginTop: 8 }}>
         「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
-      </p>
+      </p>}
     </section>
   );
 }

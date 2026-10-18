@@ -12,10 +12,11 @@ import { join } from "node:path";
 
 export const OG_SIZE = { width: 1200, height: 630 };
 
+// サイトと同じ「値札」の色。最安は黄色い札
 const C = {
-  navy: "#16324F", bg: "#F3F6F4", card: "#FFFFFF", line: "#DDE5E1", sub: "#5B6B7B",
-  green: "#059669", greenBg: "#E7F8F0", gold: "#E3A008",
-  rakuten: "#BF0000", yahoo: "#FF0033", amazon: "#232F3E",
+  navy: "#1F2350", bg: "#EEF0F7", card: "#FFFFFF", line: "#DFE2EE", sub: "#474A72",
+  green: "#1F2350", greenBg: "#FFD84D", gold: "#FFD84D", mint: "#23885C",
+  rakuten: "#BF0000", yahoo: "#E60033", amazon: "#232F3E",
 };
 const STORES = [["rakuten", "楽天"], ["yahoo", "Yahoo!"], ["amazon", "Amazon"]];
 const yen = (n) => (n == null ? "—" : "¥" + Math.round(n).toLocaleString("ja-JP"));
@@ -92,8 +93,8 @@ function PriceRows({ prices, size = 20 }) {
       {STORES.map(([s, label]) => {
         const on = s === best;
         return (
-          <div key={s} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 8px", borderRadius: 8, background: on ? C.greenBg : "transparent", border: on ? `2px solid ${C.green}` : "2px solid transparent" }}>
-            <div style={{ display: "flex", fontSize: size * 0.72, color: C[s], fontWeight: 700 }}>{label}</div>
+          <div key={s} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "2px 8px", borderRadius: 8, background: on ? C.greenBg : "transparent", border: "2px solid transparent" }}>
+            <div style={{ display: "flex", fontSize: size * 0.72, color: on ? C.navy : C[s], fontWeight: 700 }}>{label}</div>
             <div style={{ display: "flex", fontSize: size, color: prices?.[s] != null ? (on ? C.green : C.navy) : "#B8C4CE", fontWeight: 700 }}>{yen(prices?.[s])}</div>
           </div>
         );
@@ -102,11 +103,12 @@ function PriceRows({ prices, size = 20 }) {
   );
 }
 
-function Header({ title, subtitle, kicker }) {
+function Header({ title, subtitle, kicker, by }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", background: C.navy, padding: "22px 40px 18px", color: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {kicker && <div style={{ display: "flex", background: C.gold, color: C.navy, fontSize: 22, padding: "3px 14px", borderRadius: 8 }}>{kicker}</div>}
+        {by && <div style={{ display: "flex", fontSize: 20, opacity: 0.9 }}>{by}のおすすめ</div>}
         <div style={{ display: "flex", marginLeft: "auto", fontSize: 22, opacity: 0.85 }}>オウダン|3サイト価格比較</div>
       </div>
       <div style={{ display: "flex", fontSize: title.length > 24 ? 40 : 48, lineHeight: 1.25, marginTop: 8, maxHeight: 122, overflow: "hidden" }}>{title}</div>
@@ -153,10 +155,10 @@ export function CollectionOG({ data }) {
           return (
             <div key={i} style={{ display: "flex", alignItems: "center", height: rowH, borderTop: `2px solid ${C.line}`, background: i % 2 ? "#FAFCFB" : "#fff" }}>
               <div style={{ display: "flex", width: img + 14 }}><ImgBox src={it.image} size={img} radius={10} /></div>
-              <div style={{ display: "flex", flex: 1, fontSize: fs, color: C.navy, lineHeight: 1.25, paddingRight: 10, maxHeight: rowH - 6, overflow: "hidden" }}>{clip(it.name, 44)}</div>
+              <div style={{ display: "flex", flex: 1, fontSize: fs, color: C.navy, lineHeight: 1.25, paddingRight: 10, maxHeight: rowH - 6, overflow: "hidden" }}>{it.head ? clip(it.head, 18) : clip(it.name, 44)}</div>
               {STORES.map(([s]) => (
                 <div key={s} style={{ display: "flex", width: 168, justifyContent: "flex-end" }}>
-                  <div style={{ display: "flex", fontSize: fs + 4, padding: "2px 10px", borderRadius: 8, color: it.prices?.[s] == null ? "#B8C4CE" : s === best ? C.green : C.navy, background: s === best ? C.greenBg : "transparent", border: s === best ? `2px solid ${C.green}` : "2px solid transparent" }}>
+                  <div style={{ display: "flex", fontSize: fs + 4, padding: "2px 10px", borderRadius: 8, color: it.prices?.[s] == null ? "#B8C4CE" : s === best ? C.green : C.navy, background: s === best ? C.greenBg : "transparent", border: "2px solid transparent" }}>
                     {yen(it.prices?.[s])}
                   </div>
                 </div>
@@ -200,7 +202,14 @@ export function CollectionOG({ data }) {
               )}
             </div>
             <ImgBox src={it.image} size={img} />
-            <div style={{ display: "flex", flexShrink: 0, fontSize: nameFs, color: C.navy, lineHeight: 1.3, marginTop: 8, height: nameH - 8, overflow: "hidden", width: "100%" }}>{fit2(it.name)}</div>
+            {it.head ? (
+              <div style={{ display: "flex", flexShrink: 0, fontSize: nameFs + 2, color: C.navy, lineHeight: 1.25, marginTop: 8, height: nameH - 8, overflow: "hidden", width: "100%", flexDirection: "column" }}>
+                <div style={{ display: "flex" }}>{clip(it.head, 14)}</div>
+                <div style={{ display: "flex", fontSize: Math.round(nameFs * 0.72), color: C.sub }}>{clip(it.name, Math.floor(perLine * 1.2))}</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexShrink: 0, fontSize: nameFs, color: C.navy, lineHeight: 1.3, marginTop: 8, height: nameH - 8, overflow: "hidden", width: "100%" }}>{fit2(it.name)}</div>
+            )}
             <div style={{ display: "flex", flexShrink: 0, marginTop: "auto", width: "100%" }}><PriceRows prices={it.prices} size={priceFs} /></div>
           </div>
         ))}
@@ -210,7 +219,7 @@ export function CollectionOG({ data }) {
 
   return (
     <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", background: C.bg, fontFamily: "NotoJP" }}>
-      <Header title={clip(data.title, 44)} subtitle={data.subtitle ? clip(data.subtitle, 50) : ""} kicker={kicker} />
+      <Header title={clip(data.title, 44)} subtitle={data.subtitle ? clip(data.subtitle, 50) : ""} kicker={kicker} by={data.by ? clip(data.by, 20) : ""} />
       {body}
       <Footer date={data.date} />
     </div>
@@ -231,16 +240,59 @@ export function ProductOG({ data }) {
         <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
           <div style={{ display: "flex", fontSize: 36, color: C.navy, lineHeight: 1.3, maxHeight: 142, overflow: "hidden" }}>{clip(data.name, 46)}</div>
           {data.statLine && (
-            <div style={{ display: "flex", marginTop: 10, fontSize: 24, color: C.green, background: C.greenBg, borderRadius: 10, padding: "4px 14px", alignSelf: "flex-start" }}>{data.statLine}</div>
+            <div style={{ display: "flex", marginTop: 10, fontSize: 24, color: "#fff", background: C.mint, borderRadius: 10, padding: "4px 14px", alignSelf: "flex-start" }}>{data.statLine}</div>
           )}
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: "auto" }}>
             {STORES.map(([s, l]) => {
               const on = s === best;
               return (
-                <div key={s} style={{ display: "flex", alignItems: "center", padding: "6px 18px", borderRadius: 12, background: on ? C.greenBg : "#fff", border: on ? `3px solid ${C.green}` : `2px solid ${C.line}` }}>
-                  <div style={{ display: "flex", fontSize: 28, color: C[s], width: 170 }}>{l}</div>
-                  {on && <div style={{ display: "flex", fontSize: 20, color: "#fff", background: C.green, borderRadius: 6, padding: "2px 10px" }}>最安</div>}
+                <div key={s} style={{ display: "flex", alignItems: "center", padding: "6px 18px", borderRadius: 12, background: on ? C.greenBg : "#fff", border: on ? `3px solid ${C.greenBg}` : `2px solid ${C.line}` }}>
+                  <div style={{ display: "flex", fontSize: 28, color: on ? C.navy : C[s], width: 170 }}>{l}</div>
+                  {on && <div style={{ display: "flex", fontSize: 20, color: "#fff", background: C.navy, borderRadius: 6, padding: "2px 10px" }}>最安</div>}
                   <div style={{ display: "flex", marginLeft: "auto", fontSize: 40, color: data.prices?.[s] == null ? "#B8C4CE" : on ? C.green : C.navy }}>{yen(data.prices?.[s])}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <Footer date={data.date} />
+    </div>
+  );
+}
+
+// 1商品をしっかり紹介(おすすめポイント3つ+3サイトの値段)
+//  data: { title, by, date, item: { name, image, head, prices }, points: [..] }
+export function PickOG({ data }) {
+  const it = data.item || {};
+  const best = cheapestOf(it.prices);
+  const pts = (data.points || []).slice(0, 3);
+  return (
+    <div style={{ width: 1200, height: 630, display: "flex", flexDirection: "column", background: C.bg, fontFamily: "NotoJP" }}>
+      <div style={{ display: "flex", alignItems: "center", background: C.navy, color: "#fff", padding: "18px 40px", gap: 14 }}>
+        <div style={{ display: "flex", background: C.gold, color: C.navy, fontSize: 22, padding: "3px 14px", borderRadius: 8 }}>{data.by ? `${clip(data.by, 16)}のおすすめ` : "おすすめ"}</div>
+        <div style={{ display: "flex", fontSize: data.title.length > 22 ? 32 : 38, flex: 1, overflow: "hidden", maxHeight: 50 }}>{clip(data.title || it.head || it.name, 30)}</div>
+        <div style={{ display: "flex", fontSize: 20, opacity: 0.85 }}>オウダン</div>
+      </div>
+      <div style={{ display: "flex", flex: 1, padding: "22px 40px", gap: 30 }}>
+        <div style={{ display: "flex", flexDirection: "column", width: 330, gap: 12 }}>
+          <ImgBox src={it.image} size={300} radius={22} />
+          <div style={{ display: "flex", fontSize: 20, color: C.sub, lineHeight: 1.3, maxHeight: 54, overflow: "hidden" }}>{clip(it.name, 34)}</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", flex: 1, gap: 10 }}>
+          {pts.map((p, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, background: "#fff", border: `2px solid ${C.line}`, borderRadius: 14, padding: "10px 16px" }}>
+              <div style={{ display: "flex", width: 40, height: 40, borderRadius: 20, background: C.navy, color: "#fff", fontSize: 22, alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+              <div style={{ display: "flex", fontSize: 28, color: C.navy, lineHeight: 1.25 }}>{clip(p, 28)}</div>
+            </div>
+          ))}
+          <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
+            {STORES.map(([s, l]) => {
+              const on = s === best;
+              return (
+                <div key={s} style={{ display: "flex", flexDirection: "column", flex: 1, padding: "8px 14px", borderRadius: 12, background: on ? C.greenBg : "#fff", border: on ? `3px solid ${C.greenBg}` : `2px solid ${C.line}` }}>
+                  <div style={{ display: "flex", fontSize: 20, color: on ? C.navy : C[s] }}>{l}{on ? " 最安" : ""}</div>
+                  <div style={{ display: "flex", fontSize: 34, color: it.prices?.[s] == null ? "#B8C4CE" : C.navy }}>{yen(it.prices?.[s])}</div>
                 </div>
               );
             })}

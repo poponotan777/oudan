@@ -25,6 +25,10 @@ import TopPicks from "./components/TopPicks";
 import Heart from "./components/Heart";
 import InstallCard from "./components/InstallCard";
 import ShareCard from "./components/ShareCard";
+import Feed from "./components/Feed";
+import BuyBox from "./components/BuyBox";
+import PriceChart from "./components/PriceChart";
+import { cardsFor } from "../lib/cards";
 import { SiteHeader, SiteFooter } from "./components/SiteChrome";
 
 // 楽天のsort値: standard(標準)/+itemPrice(安い)/-itemPrice(高い)/-reviewCount/-reviewAverage
@@ -178,7 +182,9 @@ function Detail({ product, rates, viewHistory, onOpenRelated }) {
         {desc && <p className="o-desc">{desc}</p>}
       </div>
 
-      <PriceCompare name={product.name} offers={product.offers} dbOffers={db?.offers} rates={rates} />
+      {db && <div className="o-box" style={{ marginTop: 12 }}><BuyBox offers={db.offers} rates={rates} name={product.name} /></div>}
+      <PriceCompare name={product.name} offers={product.offers} dbOffers={db?.offers} rates={rates} showTag={!db} />
+      {db && <PriceChart offers={db.offers} />}
 
       {totalReviews > 0 && (
         <section>
@@ -223,6 +229,23 @@ function Detail({ product, rates, viewHistory, onOpenRelated }) {
       {viewHistory?.length > 1 && <Strip title="最近見た商品" items={viewHistory.filter((v) => v.key !== key0)} onOpen={onOpenRelated} />}
     </div>
   );
+}
+
+// 気になるの「いまの値段」を読む(DBにある商品だけ)
+function FavNow({ favs, onLoad }) {
+  const keys = favs.filter((f) => f.inDb).map((f) => f.pkey).slice(0, 100).join("|");
+  useEffect(() => {
+    if (!keys) return;
+    let alive = true;
+    cardsFor(supabase, keys.split("|")).then((cards) => {
+      if (!alive) return;
+      const m = {};
+      for (const c of cards) m[c.pkey] = c;
+      onLoad(m);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [keys]);
+  return null;
 }
 
 // ------------------------------------------------------------
@@ -281,6 +304,7 @@ export default function Home() {
   const [saleLoaded, setSaleLoaded] = useState(false);
   const [status, setStatus] = useState(null);
   const [favs, setFavs] = useState([]);
+  const [favNow, setFavNow] = useState({}); // pkey → いまのカード(値段)
 
   // ブラウザの「戻る」で詳細を閉じる(サイトの外には出ない)
   useEffect(() => {
@@ -496,6 +520,7 @@ export default function Home() {
             <TodayStrip status={status} sheetEvents={saleEvents} onEdit={goSettings} />
             <SaleCalendarList sheetEvents={saleEvents} loaded={saleLoaded} />
             <TopPicks rates={effRates} />
+            <Feed />
             <Strip title="最近見た商品" items={viewHistory} onOpen={(it) => openFromList({ jan: it.key, name: it.name, image: it.image })} />
             
           </>
@@ -561,6 +586,7 @@ export default function Home() {
         {/* ===== 気になる ===== */}
         {view === "fav" && !selected && (
           <section>
+            <FavNow favs={favs} onLoad={setFavNow} />
             <h2 className="o-h2" style={{ marginTop: 4 }}>気になる<small>{favs.length}件・この端末の中だけに保存</small></h2>
             {favs.length === 0 ? (
               <div className="o-box o-empty">
@@ -575,13 +601,26 @@ export default function Home() {
                     {f.image ? <img className="o-tile-img" src={f.image} alt="" loading="lazy" /> : <div className="o-tile-img" />}
                     <Heart item={f} />
                     <div className="o-tile-name">{displayName(f.name)}</div>
-                    {f.price != null && (
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 4 }}>
-                        {f.store && <span className={`o-store ${f.store}`}>{STORE_META[f.store]?.short}</span>}
-                        <span className="o-num price">¥{num(f.price)}</span>
-                      </div>
-                    )}
-                    <div className="o-note" style={{ marginTop: 2 }}>入れたときの値段</div>
+                    {(() => {
+                      const now = favNow[f.pkey];
+                      const p = now?.price ?? f.price;
+                      const st = now?.store ?? f.store;
+                      const diff = now && f.price ? now.price - f.price : 0;
+                      return (
+                        <>
+                          {p != null && (
+                            <div className="deal">
+                              {now?.off > 0 && <span className="off">{now.off}%安</span>}
+                              <span className="o-num price">¥{num(p)}</span>
+                              {st && <span className={`s-${st}`} style={{ fontWeight: 900, fontSize: 12 }}>{STORE_META[st]?.short}</span>}
+                            </div>
+                          )}
+                          {diff < 0 && <div className="o-fav-diff down">入れたときより¥{num(-diff)}安い</div>}
+                          {diff > 0 && <div className="o-fav-diff up">入れたときより¥{num(diff)}高い</div>}
+                          {!now && f.price != null && <div className="o-note" style={{ margin: "2px 0 0" }}>入れたときの値段</div>}
+                        </>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
