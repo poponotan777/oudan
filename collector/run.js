@@ -12,6 +12,7 @@ import { Clock, log, rpc, rest, dbReady, jstDay, jstHour, purgeAmazon } from "./
 import { runRakuten } from "./rakuten.js";
 import { runYahoo } from "./yahoo.js";
 import { runAmazon } from "./amazon.js";
+import { runKeepa } from "./keepa.js";
 
 const MB = 1024 * 1024;
 const WARN_BYTES = Number(process.env.DB_WARN_MB || 400) * MB;   // これを超えたら「有料プランを検討」の通知
@@ -57,11 +58,12 @@ async function main() {
   }
 
   const ctx = { clock, slot, day, noNew, dryRun };
-  const results = await Promise.allSettled([runRakuten(ctx), runYahoo(ctx), runAmazon(ctx)]);
-  const stats = results.map((r, i) => (r.status === "fulfilled" ? r.value : { store: ["rakuten", "yahoo", "amazon"][i], note: "失敗: " + String(r.reason).slice(0, 200), requests: 0, written: 0, errors: 1 }));
+  // Keepa(Amazonの値段の記録)は KEEPA_KEY を入れたときだけ動く(v31)
+  const results = await Promise.allSettled([runRakuten(ctx), runYahoo(ctx), runAmazon(ctx), runKeepa(ctx)]);
+  const stats = results.map((r, i) => (r.status === "fulfilled" ? r.value : { store: ["rakuten", "yahoo", "amazon", "keepa"][i], note: "失敗: " + String(r.reason).slice(0, 200), requests: 0, written: 0, errors: 1 }));
 
   if (!dryRun) {
-    // Amazonのデータは24時間まで(Amazonの規約)。古い行と90日の記録を消す
+    // Amazonのデータは24時間まで(Amazonの規約)。古い行を消す
     try { const p = await purgeAmazon(); log(`Amazonの古い価格行を削除 ${p.deleted}件`); } catch (e) { log("Amazonの古い行の削除に失敗", String(e).slice(0, 200)); }
     // 他サイトにまだ無い商品を、次回探す予約に入れる
     try {
@@ -84,7 +86,7 @@ async function main() {
   }
 
   // 結果のまとめ(GitHub の実行画面に表で出る)
-  const NAMES = { rakuten: "楽天", yahoo: "Yahoo!", amazon: "Amazon" };
+  const NAMES = { rakuten: "楽天", yahoo: "Yahoo!", amazon: "Amazon", keepa: "Keepa(Amazonの記録)" };
   summary(`## オウダン自動取得 ${day} ${SLOT_NAME[slot] || slot}(${clock.elapsedMin()}分)`);
   summary("| サイト | APIリクエスト | 書き込み | エラー | メモ |\n|---|---:|---:|---:|---|");
   for (const s of stats) summary(`| ${NAMES[s.store]} | ${s.requests || 0} | ${s.written || 0} | ${s.errors || 0} | ${(s.note || "").replace(/\|/g, "/")} |`);
@@ -108,7 +110,7 @@ async function main() {
     } catch {}
   }
 
-  const allFailed = stats.every((s) => (s.written || 0) === 0) && stats.some((s) => (s.requests || 0) > 0);
+  const allFailed = stats.filter((s) => s.store !== "keepa").every((s) => (s.written || 0) === 0) && stats.some((s) => (s.requests || 0) > 0);
   if (allFailed && !dryRun) {
     console.log("::error::どのサイトからも商品を書き込めませんでした。キーや設定を確認してください");
     exitCode = 1;

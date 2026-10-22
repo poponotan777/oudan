@@ -8,7 +8,8 @@
 
 import { useEffect, useState } from "react";
 
-const NAMES = { rakuten: "楽天", yahoo: "Yahoo!", amazon: "Amazon" };
+const NAMES = { rakuten: "楽天", yahoo: "Yahoo!", amazon: "Amazon", keepa: "Keepa" };
+const SLOTS = { am: "午前", pm: "午後", fill: "補完" };
 const fmt = (iso) => {
   if (!iso) return "";
   const j = new Date(new Date(iso).getTime() + 9 * 3600 * 1000);
@@ -78,7 +79,7 @@ export default function AdminConsole() {
           <tbody>
             {(status?.runs || []).map((r, i) => (
               <tr key={i} style={{ borderTop: "1px solid #E2E8F0" }}>
-                <td style={td}>{fmt(r.started_at)}</td><td style={td}>{r.slot === "am" ? "午前" : "午後"}</td><td style={td}>{NAMES[r.store] || r.store}</td>
+                <td style={td}>{fmt(r.started_at)}</td><td style={td}>{SLOTS[r.slot] || r.slot}</td><td style={td}>{NAMES[r.store] || r.store}</td>
                 <td style={td}>{r.requests}</td><td style={{ ...td, color: r.items ? "#065F46" : "#B91C1C", fontWeight: 700 }}>{r.items}</td>
                 <td style={{ ...td, color: r.errors ? "#B91C1C" : "#64748B" }}>{r.errors}</td><td style={{ ...td, color: "#64748B" }}>{r.note}</td>
               </tr>

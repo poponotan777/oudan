@@ -2,6 +2,7 @@
 // 90日の値段の動き(3サイトを1枚に重ねる)。点は1日1つ(その日の最安値)
 import { useState } from "react";
 import { STORE_ORDER, STORE_META, histRows, fmtDay } from "../../lib/priceView";
+import { KEEPA_CREDIT, KEEPA_URL } from "../../lib/keepa";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
 const W = 640, H = 200, PL = 8, PR = 8, PT = 14, PB = 24;
@@ -73,6 +74,9 @@ export default function PriceChart({ offers }) {
             <b>{fmtDay(hover.day)}</b>
             {STORE_ORDER.filter((s) => hover.at[s] != null).map((s) => <span key={s}><i className={`dot ${s}`} />{STORE_META[s].short} ¥{num(hover.at[s])}</span>)}
           </div>
+        )}
+        {series.some((x) => offers?.[x.s]?.hist_src === "keepa") && (
+          <p className="o-credit-note"><a href={KEEPA_URL} target="_blank" rel="noopener noreferrer">{KEEPA_CREDIT}</a></p>
         )}
       </div>
     </section>

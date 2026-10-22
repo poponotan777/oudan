@@ -133,7 +133,7 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
         })}
       </div>
       {note && <p className="o-note" style={{ marginTop: 8 }}>
-        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です(Amazonは規約により記録を持たないため出しません)。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
+        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です{rows.amazon?.stats && dbOffers?.amazon?.hist_src === "keepa" ? "(Amazonの記録はKeepaのデータをもとに作成)" : "(Amazonは記録がないため出しません)"}。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
       </p>}
       {rows.amazon && <p className="o-note" style={{ marginTop: 4 }}>{AMAZON_DISCLAIMER}</p>}
     </section>

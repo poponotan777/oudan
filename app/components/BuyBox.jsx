@@ -3,6 +3,7 @@
 //   煽らない:ここに出す数字は、オウダンが記録した値段とセールの予定からだけ作る
 import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay, trustedOffers, atLabel, AMAZON_DISCLAIMER } from "../../lib/priceView";
 import { upcomingSales, daysUntil } from "../../lib/saleCalendar";
+import { KEEPA_CREDIT, KEEPA_URL } from "../../lib/keepa";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
 
@@ -25,15 +26,14 @@ export default function BuyBox({ offers: raw, rates, name, onBuy }) {
   const worst = [...list].sort((a, b) => b.eff - a.eff)[0];
   const st = statsFor(best.o.price, best.o);
   const v = best.s === "amazon" && !st
-    ? { tone: "none", word: "記録なし", why: "Amazonは規約により値段の記録を持てないため、買い時の目安は出せません。" }
+    ? { tone: "none", word: "記録なし", why: "Amazonの値段の記録がないため、買い時の目安は出せません。" }
     : verdict(st);
   const ok = st && st.days >= 7;
   const off = ok && st.diffPct <= -1 ? Math.round(-st.diffPct) : 0;
   const gain = ok && st.median > best.o.price ? st.median - best.o.price : 0;
   const save = list.length >= 2 ? worst.eff - best.eff : 0;
   // 90日の中での位置(左=最安、右=最高)
-  const vals = (best.o.hist || []).filter((x) => x != null).map(Number);
-  const lo = vals.length ? Math.min(...vals) : null, hi = vals.length ? Math.max(...vals) : null;
+  const lo = ok ? st.min : null, hi = ok ? st.max : null;
   const pos = lo != null && hi > lo ? Math.min(1, Math.max(0, (best.o.price - lo) / (hi - lo))) : null;
   // もうすぐのセール(10日以内)
   const now = new Date();
@@ -75,6 +75,9 @@ export default function BuyBox({ offers: raw, rates, name, onBuy }) {
             <div className="bar"><span className="pin" style={{ left: `${pos * 100}%` }} /></div>
             <div className="ends"><span>最安 ¥{num(lo)}</span><span>最高 ¥{num(hi)}</span></div>
           </div>
+        )}
+        {best.o.hist_src === "keepa" && ok && (
+          <div className="o-credit-note"><a href={KEEPA_URL} target="_blank" rel="noopener noreferrer">{KEEPA_CREDIT}</a></div>
         )}
       </div>
       {best.o.url && (

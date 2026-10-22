@@ -12,9 +12,9 @@ import { searchRakutenClient } from "../lib/rakutenClient";
 import { mergeOffers } from "../lib/merge";
 import { unitPriceLabel } from "../lib/unitPrice";
 import { loadStatus, saveStatus, ratesForPrice } from "../lib/status";
-import { RECORD_ON_SEARCH, RECORD_LIMIT, canRecordNow } from "../lib/writePolicy";
 import { AMAZON_AFFILIATE_ON } from "../lib/featureFlags";
 import { loadCatalog, augmentProduct } from "../lib/catalog";
+import { withKeepa } from "../lib/keepaClient";
 import { statsFor, statsLabel, productPath, STORE_META, effectivePrice, displayName } from "../lib/priceView";
 import { painsForProduct, displayCatch } from "../lib/pains";
 import { CATEGORIES } from "../lib/categories";
@@ -135,7 +135,7 @@ function Detail({ product, rates, viewHistory, onOpenRelated }) {
     if (product.db) { setDb(product.db); return; }
     if (!key0) return;
     let alive = true;
-    loadCatalog(supabase, [key0]).then((m) => { if (alive) setDb(m.get(key0) || null); }).catch(() => {});
+    loadCatalog(supabase, [key0]).then(withKeepa).then((m) => { if (alive) setDb(m.get(key0) || null); }).catch(() => {});
     return () => { alive = false; };
   }, [key0, product.db]);
 
@@ -346,7 +346,7 @@ export default function Home() {
     const keys = [...new Set(products.map((p) => p.key || p.jan).filter(Boolean))].slice(0, 300);
     if (keys.length === 0) { setCatalog(new Map()); return; }
     let alive = true;
-    loadCatalog(supabase, keys).then((m) => { if (alive) setCatalog(m); }).catch(() => {});
+    loadCatalog(supabase, keys).then(withKeepa).then((m) => { if (alive) setCatalog(m); }).catch(() => {});
     return () => { alive = false; };
   }, [results]);
 
@@ -355,15 +355,6 @@ export default function Home() {
     setView(v);
     try { window.history.replaceState(null, "", v === "home" ? "/" : `/?v=${v}`); } catch {}
     window.scrollTo(0, 0);
-  };
-
-  const recordOnSearch = (products) => {
-    try {
-      if (!(RECORD_ON_SEARCH && canRecordNow())) return;
-      const items = products.slice(0, RECORD_LIMIT).flatMap((p) =>
-        (p.key || p.jan) ? p.offers.map((o) => ({ jan: p.key || p.jan, store: o.store, price: o.price })) : []);
-      if (items.length) fetch("/api/record-prices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
-    } catch {}
   };
 
   // DBの商品を先に、APIで見つかった商品をその後ろに(同じ商品は1つに)
@@ -418,7 +409,6 @@ export default function Home() {
       setRawOffers(all);
       const products = withDb(dbItems, mergeOffers(all)).slice(0, 500);
       setResults({ query: kw, products, sortKey: useSort });
-      recordOnSearch(products);
     } catch {
       setResults({ query: kw, error: true, products: [] });
     }
@@ -446,7 +436,6 @@ export default function Home() {
       setSearchPage(next);
       const products = withDb(dbProducts, mergeOffers(all)).slice(0, 500);
       setResults({ query: results.query, products, sortKey: sort });
-      recordOnSearch(products);
     } catch {}
     setLoadingMore(false);
   };

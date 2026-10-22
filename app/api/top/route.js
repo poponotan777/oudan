@@ -7,6 +7,7 @@ import { publicDb } from "../../../lib/supabaseServer";
 import { loadCatalog } from "../../../lib/catalog";
 import { STORE_ORDER, STORE_META, statsFor, statsLabel, lotSuspects } from "../../../lib/priceView";
 import { conceptsOf } from "../../../lib/reco";
+import { keepaDeals } from "../../../lib/keepaServer";
 
 // 定番に出さないもの
 const NICHE = /CD|DVD|Blu-?ray|ブルーレイ|e ?SIM|SIMカード|SIM ?フリー|ギフト券|ギフトカード|プリペイド|チケット|書籍|単行本|文庫|コミック|雑誌|ゲームソフト|ダウンロード版|オンラインコード|ソフトウェア|サブスク|会員|フィギュア|トレカ|カード ?ゲーム|ふるさと納税|中古|訳あり/i;
@@ -32,6 +33,12 @@ async function candidates(sb, store) {
   // お得
   for (const [minDays, ratio] of [[7, 0.92], [3, 0.95]]) {
     if (out.deal.length >= WANT) break;
+    if (store === "amazon") {
+      // Amazonの記録はDBの offers に持たない → Keepaの記録(あるときだけ)と今の値段で選ぶ(v31)
+      const rows = await keepaDeals(minDays, ratio, 300);
+      push("deal", rows.map((o) => ({ pkey: o.pkey, score: (o.median90 - o.price) / o.median90 })));
+      continue;
+    }
     const { data } = await sb.from("offers").select("pkey, price, median90, rank90, days")
       .eq("store", store).gte("days", minDays).gt("median90", 0).gte("price", 300).gte("updated_at", daysAgo(2))
       .order("rank90", { ascending: true }).limit(1000);

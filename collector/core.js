@@ -360,18 +360,14 @@ export async function staleList(store, n, olderHours = 36) {
 // Amazonのデータは24時間までしか持たない(Amazonアソシエイト・プログラム・ポリシー「本ライセンス」2(h):
 //   画像以外のコンテンツはキャッシュ目的で最長24時間、画像は保存不可・リンクは最長24時間)
 //   ・24時間より前に取った Amazon の価格行は消す(ASINは期間の制限なく持てる → 消した商品の補完予約で使う)
-//   ・Amazon の90日の記録(hist など)は持たない
+//   ・Amazon の90日の記録(hist など)は持たない → v31 から DB の書き込み時に空にする(sql/v31-keepa.sql のトリガー)
+//     (Amazonの記録は Keepa から別の表 keepa_hist に。Keepa の規約で保存してよいデータ)
 //   ・Amazon の画像URLを商品の画像にしている場合は消す
 // ============================================================
 export async function purgeAmazon({ dryRun = false } = {}) {
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   if (dryRun) return { deleted: 0 };
   const del = await rest(`offers?store=eq.amazon&updated_at=lt.${encodeURIComponent(since)}&select=pkey`, { method: "DELETE", prefer: "return=representation" }) || [];
-  await rest(`offers?store=eq.amazon&or=(days.gt.1,median90.not.is.null,hist_start.not.is.null)`, {
-    method: "PATCH",
-    body: { hist: null, hist_start: null, days: null, median90: null, min90: null, rank90: null, distinct90: null },
-    prefer: "return=minimal",
-  }).catch(() => {});
   const keys = [...new Set(del.map((r) => r.pkey))];
   for (let i = 0; i < keys.length; i += 80) {
     await rest(`products?pkey=${encodeURIComponent(inList(keys.slice(i, i + 80)))}&image=like.*amazon*`, {

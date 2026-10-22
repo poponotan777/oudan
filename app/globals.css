@@ -561,3 +561,7 @@ textarea.o-input { resize: vertical; line-height: 1.6; }
 .o-tile:has(> .o-heart) { padding-top: 46px; }
 .o-tile > .o-heart { top: 6px; right: 6px; }
 .o-chart .ln.gap { stroke-dasharray: 5 5; opacity: .55; }
+
+/* v31:Keepaの出典 */
+.o-credit-note { margin-top: 8px; font-size: 11px; color: var(--ink-2); }
+.o-credit-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
