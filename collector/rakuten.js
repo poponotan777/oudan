@@ -14,7 +14,7 @@ import { BRANDS } from "./brands.js";
 import { RAKUTEN_FALLBACK_GENRES, RAKUTEN_SKIP_GENRE } from "./genres.js";
 import {
   Pacer, Writer, log, rpc, getState, setState, cleanText, cleanName, enrich, jstToIso,
-  NOISE, shortQuery, pickSame, describe } from "./core.js";
+  NOISE, shortQuery, pickSame, describe, staleList } from "./core.js";
 
 const RANK_URL = "https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601";
 const GENRE_URL = "https://openapi.rakuten.co.jp/ichibagt/api/IchibaGenre/Search/20260701";
@@ -153,10 +153,10 @@ async function brandSearch(pacer, writer, brands) {
 }
 
 // 他サイトで見つかった商品を、楽天でも探す
-async function fill(pacer, writer, n) {
+async function fill(pacer, writer, n, given = null) {
   if (!pacer.canGo()) return { tried: 0, found: 0 };
-  let list = [];
-  try { list = (await rpc("take_fill", { _store: "rakuten", _n: n })) || []; } catch (e) { log("[楽天] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  let list = given || [];
+  if (!given) try { list = (await rpc("take_fill", { _store: "rakuten", _n: n })) || []; } catch (e) { log("[楽天] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
   const results = [];
   let found = 0;
   for (const q of list) {
@@ -184,8 +184,16 @@ async function fill(pacer, writer, n) {
     await writer.flushIfFull();
   }
   await writer.flush();
-  try { await rpc("fill_done", { _items: results }); } catch {}
+  if (!given) try { await rpc("fill_done", { _items: results }); } catch {}
   return { tried: results.length, found };
+}
+
+// 値段が古くなった商品を取り直す(v30)。ランキングに出なくなった商品も、売れている順に更新し続ける
+async function refresh(pacer, writer, n, olderHours) {
+  if (!pacer.canGo() || !(n > 0)) return { tried: 0, found: 0 };
+  let list = [];
+  try { list = await staleList("rakuten", n, olderHours); } catch (e) { log("[楽天] 取り直しの候補を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  return fill(pacer, writer, n, list);
 }
 
 export async function runRakuten({ clock, slot, day, noNew, dryRun }) {
@@ -198,8 +206,10 @@ export async function runRakuten({ clock, slot, day, noNew, dryRun }) {
     if (slot === "fill") {
       // 補完だけの回(v24):残り時間で回せる件数だけ予約から取り出す
       const n = Math.min(Number(process.env.RAKUTEN_FILL_ONLY || 3000), Math.floor((clock.left() - 30000) / pacer.interval));
-      const f = await fill(pacer, writer, Math.max(n, 0));
-      stat.note = `補完だけの回 ${f.found}/${f.tried}件`;
+      // 半分は「値段が古くなった商品の取り直し」、残りで補完(v30)
+      const rf = await refresh(pacer, writer, Math.floor(Math.max(n, 0) / 2), 36);
+      const f = await fill(pacer, writer, Math.max(n - rf.tried, 0));
+      stat.note = `補完だけの回 取り直し ${rf.found}/${rf.tried}件・補完 ${f.found}/${f.tried}件`;
       return await finish();
     }
     const genres = await loadGenres(pacer);
@@ -218,7 +228,8 @@ export async function runRakuten({ clock, slot, day, noNew, dryRun }) {
     stat.items += await brandSearch(pacer, writer, half);
     await writer.flush();
     const f = await fill(pacer, writer, Number(process.env.RAKUTEN_FILL || 400));
-    stat.note = `補完 ${f.found}/${f.tried}件`;
+    const rf = await refresh(pacer, writer, Number(process.env.RAKUTEN_REFRESH || 300), 36);
+    stat.note = `補完 ${f.found}/${f.tried}件・取り直し ${rf.found}/${rf.tried}件`;
   } catch (e) {
     stat.note = "エラー: " + String(e).slice(0, 200);
     log("[楽天]", stat.note);

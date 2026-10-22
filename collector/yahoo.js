@@ -14,7 +14,7 @@ import { janKey } from "../lib/unitPrice.js";
 import { BRANDS } from "./brands.js";
 import {
   Pacer, Writer, log, rpc, getState, setState, cleanText, cleanName, enrich, jstToIso,
-  NOISE, isJan, shortQuery, pickSame, describe } from "./core.js";
+  NOISE, isJan, shortQuery, pickSame, describe, staleList } from "./core.js";
 
 const BASE = "https://shopping.yahooapis.jp/ShoppingWebService";
 const RANK_URL = `${BASE}/V1/highRatingTrendRanking`;
@@ -188,10 +188,10 @@ async function brandSearch(pacer, writer, brands) {
   return items;
 }
 
-async function fill(pacer, writer, n) {
+async function fill(pacer, writer, n, given = null) {
   if (!pacer.canGo()) return { tried: 0, found: 0 };
-  let list = [];
-  try { list = (await rpc("take_fill", { _store: "yahoo", _n: n })) || []; } catch (e) { log("[Yahoo!] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  let list = given || [];
+  if (!given) try { list = (await rpc("take_fill", { _store: "yahoo", _n: n })) || []; } catch (e) { log("[Yahoo!] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
   const results = [];
   let found = 0;
   for (const q of list) {
@@ -228,8 +228,16 @@ async function fill(pacer, writer, n) {
     await writer.flushIfFull();
   }
   await writer.flush();
-  try { await rpc("fill_done", { _items: results }); } catch {}
+  if (!given) try { await rpc("fill_done", { _items: results }); } catch {}
   return { tried: results.length, found };
+}
+
+// 値段が古くなった商品を取り直す(v30)。ランキングに出なくなった商品も、売れている順に更新し続ける
+async function refresh(pacer, writer, n, olderHours) {
+  if (!pacer.canGo() || !(n > 0)) return { tried: 0, found: 0 };
+  let list = [];
+  try { list = await staleList("yahoo", n, olderHours); } catch (e) { log("[Yahoo!] 取り直しの候補を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  return fill(pacer, writer, n, list);
 }
 
 export async function runYahoo({ clock, slot, day, noNew, dryRun }) {
@@ -241,8 +249,9 @@ export async function runYahoo({ clock, slot, day, noNew, dryRun }) {
   try {
     if (slot === "fill") {
       const n = Math.min(Number(process.env.YAHOO_FILL_ONLY || 3000), Math.floor((clock.left() - 30000) / pacer.interval));
-      const f = await fill(pacer, writer, Math.max(n, 0));
-      stat.note = `補完だけの回 ${f.found}/${f.tried}件`;
+      const rf = await refresh(pacer, writer, Math.floor(Math.max(n, 0) / 2), 36);
+      const f = await fill(pacer, writer, Math.max(n - rf.tried, 0));
+      stat.note = `補完だけの回 取り直し ${rf.found}/${rf.tried}件・補完 ${f.found}/${f.tried}件`;
       return await finish();
     }
     const genres = await loadGenres();
@@ -260,7 +269,8 @@ export async function runYahoo({ clock, slot, day, noNew, dryRun }) {
     stat.items += await brandSearch(pacer, writer, half);
     await writer.flush();
     const f = await fill(pacer, writer, Number(process.env.YAHOO_FILL || 250));
-    stat.note = `補完 ${f.found}/${f.tried}件`;
+    const rf = await refresh(pacer, writer, Number(process.env.YAHOO_REFRESH || 250), 36);
+    stat.note = `補完 ${f.found}/${f.tried}件・取り直し ${rf.found}/${rf.tried}件`;
     // 覚えたジャンルを保存(次回からジャンル別ランキングに使う)
     if (seenGenres.size >= 5 && !dryRun) {
       const merged = new Map(genres.map((g) => [g.id, g.name]));

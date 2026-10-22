@@ -8,7 +8,7 @@
 
 import {
   STORE_ORDER, STORE_META, yen, statsFor, statsLabel, effectivePrice, extraPointPct,
-  fmtTime, fmtDay, searchUrl, lotSuspects, suspectText,
+  fmtTime, fmtDay, searchUrl, lotSuspects, suspectText, AMAZON_DISCLAIMER, atLabel,
 } from "../../lib/priceView";
 
 const num = (n) => (n == null ? "—" : Math.round(Number(n)).toLocaleString("ja-JP"));
@@ -133,8 +133,9 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
         })}
       </div>
       {note && <p className="o-note" style={{ marginTop: 8 }}>
-        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
+        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です(Amazonは規約により記録を持たないため出しません)。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
       </p>}
+      {rows.amazon && <p className="o-note" style={{ marginTop: 4 }}>{AMAZON_DISCLAIMER}</p>}
     </section>
   );
 }
@@ -153,6 +154,7 @@ export function MiniCompare({ offers, dbOffers, rates }) {
           <div key={s} className={on ? "best" : o ? (o.suspect ? "none" : "") : "none"} title={o?.suspect ? suspectText(o.suspect) : undefined}>
             <div className={`s s-${s}`}>{meta.short}{on ? " 最安" : ""}</div>
             <div className="p o-num">{o ? `¥${num(o.price)}` : "—"}</div>
+            {s === "amazon" && o?.updated_at && <div className="at">{atLabel(o.updated_at)}</div>}
           </div>
         );
       })}

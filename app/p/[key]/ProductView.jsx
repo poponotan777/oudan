@@ -66,7 +66,7 @@ export default function ProductView({ product, offers, related: rel0 }) {
 
         <PriceChart offers={offers} />
 
-        <Reco keys={[product.pkey]} />
+        <Reco items={[{ pkey: product.pkey, name: product.name, genre: product.genre }]} />
 
         {(desc || pains.length > 0) && (
           <section>

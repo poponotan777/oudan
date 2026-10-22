@@ -331,3 +331,52 @@ export function pickSame(candidates, targetName, isSameProduct, { jan = null, th
   usable.sort((a, b) => a.price - b.price);
   return usable[0] || ok[0];
 }
+
+// ============================================================
+// 値段が古くなった商品の取り直し(v30)
+//   その商品がそのサイトのランキングに出なくなると、値段が更新されないまま止まってしまう。
+//   olderHours より前に取った行を、売れている商品から順に n 件選んで、補完と同じ方法で取り直す
+// ============================================================
+const inList = (keys) => "in.(" + keys.map((k) => `"${String(k).replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",") + ")";
+export async function staleList(store, n, olderHours = 36) {
+  if (!(n > 0)) return [];
+  const since = new Date(Date.now() - olderHours * 3600 * 1000).toISOString();
+  const rows = await rest(`offers?select=pkey,code&store=eq.${store}&updated_at=lt.${encodeURIComponent(since)}&order=updated_at.asc&limit=${n * 4}`) || [];
+  if (!rows.length) return [];
+  const code = new Map(rows.map((r) => [r.pkey, r.code]));
+  const prods = [];
+  const keys = [...code.keys()];
+  for (let i = 0; i < keys.length; i += 80) {
+    const part = keys.slice(i, i + 80);
+    const got = await rest(`products?select=pkey,name,jan,pop,is_brand,merged_into&pkey=${encodeURIComponent(inList(part))}`) || [];
+    prods.push(...got.filter((p) => !p.merged_into));
+  }
+  // 売れ筋の順位がある商品 → 有名ブランド → その他 の順
+  prods.sort((a, b) => ((a.pop == null) - (b.pop == null)) || ((a.pop ?? 0) - (b.pop ?? 0)) || ((b.is_brand ? 1 : 0) - (a.is_brand ? 1 : 0)));
+  return prods.slice(0, n).map((p) => ({ pkey: p.pkey, name: p.name, jan: p.jan, code: code.get(p.pkey) || null }));
+}
+
+// ============================================================
+// Amazonのデータは24時間までしか持たない(Amazonアソシエイト・プログラム・ポリシー「本ライセンス」2(h):
+//   画像以外のコンテンツはキャッシュ目的で最長24時間、画像は保存不可・リンクは最長24時間)
+//   ・24時間より前に取った Amazon の価格行は消す(ASINは期間の制限なく持てる → 消した商品の補完予約で使う)
+//   ・Amazon の90日の記録(hist など)は持たない
+//   ・Amazon の画像URLを商品の画像にしている場合は消す
+// ============================================================
+export async function purgeAmazon({ dryRun = false } = {}) {
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  if (dryRun) return { deleted: 0 };
+  const del = await rest(`offers?store=eq.amazon&updated_at=lt.${encodeURIComponent(since)}&select=pkey`, { method: "DELETE", prefer: "return=representation" }) || [];
+  await rest(`offers?store=eq.amazon&or=(days.gt.1,median90.not.is.null,hist_start.not.is.null)`, {
+    method: "PATCH",
+    body: { hist: null, hist_start: null, days: null, median90: null, min90: null, rank90: null, distinct90: null },
+    prefer: "return=minimal",
+  }).catch(() => {});
+  const keys = [...new Set(del.map((r) => r.pkey))];
+  for (let i = 0; i < keys.length; i += 80) {
+    await rest(`products?pkey=${encodeURIComponent(inList(keys.slice(i, i + 80)))}&image=like.*amazon*`, {
+      method: "PATCH", body: { image: null }, prefer: "return=minimal",
+    }).catch(() => {});
+  }
+  return { deleted: keys.length };
+}

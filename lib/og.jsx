@@ -46,7 +46,7 @@ async function loadGoogleFont(text) {
   }
 }
 export async function ogFonts(text) {
-  const FIXED = "0123456789¥,.%・〜()?…位選楽天Yahoo!Amazon最安時点の価格変動しますPR#oudanvercelappオウダンどこがいちばん安いふだんより3か月で最安値サイト比較のおすすめ画像なしTOP比較商品";
+  const FIXED = "0123456789¥,.%・〜()?…位選楽天Yahoo!Amazon最安時点の価格変動しますPR#oudanvercelappオウダンどこがいちばん安いふだんより3か月で最安値サイト比較のおすすめ画像なしTOP比較商品。変わることがあり、購入時は各表示適用されます";
   const uniq = [...new Set(String(text || "") + FIXED)].join("");
   let data = process.env.OG_FONT_LOCAL_ONLY ? null : await loadGoogleFont(uniq);
   if (!data) data = await loadLocalFont();
@@ -139,8 +139,7 @@ function Footer({ date }) {
   return (
     <div style={{ display: "flex", alignItems: "center", padding: "0 40px", height: 44, background: C.ink, color: "#fff", fontSize: 18, flexShrink: 0 }}>
       <div style={{ display: "flex", color: C.tag, fontSize: 20 }}>オウダン</div>
-      <div style={{ display: "flex", marginLeft: 14, opacity: 0.85 }}>oudan.vercel.app</div>
-      <div style={{ display: "flex", marginLeft: 20, opacity: 0.85 }}>{date ? `${date}時点の価格(変動します)` : "価格は変動します"}</div>
+      <div style={{ display: "flex", marginLeft: 16, opacity: 0.9, fontSize: 16 }}>{date ? `${date}時点の価格。変わることがあり、購入時は各サイトの表示価格が適用されます` : "価格は変わることがあり、購入時は各サイトの表示価格が適用されます"}</div>
       <div style={{ display: "flex", marginLeft: "auto", border: "2px solid #fff", borderRadius: 6, padding: "0 10px", fontSize: 16 }}>PR</div>
     </div>
   );
@@ -390,6 +389,15 @@ export function PickOG({ data }) {
       <Footer date={data.date} />
     </div>
   );
+}
+
+// 取得時刻の幅「10/22 05:10〜20:15」(画像の中の値段がいつの時点か)
+export function rangeStamp(isos) {
+  const ts = (isos || []).map((x) => Date.parse(x)).filter(Number.isFinite).sort((a, b) => a - b);
+  if (!ts.length) return jstStamp();
+  const a = jstStamp(new Date(ts[0])), b = jstStamp(new Date(ts[ts.length - 1]));
+  if (a === b) return a;
+  return a.split(" ")[0] === b.split(" ")[0] ? `${a}〜${b.split(" ")[1]}` : `${a}〜${b}`;
 }
 
 // 「10/17 17:05」

@@ -186,7 +186,7 @@ function Detail({ product, rates, viewHistory, onOpenRelated }) {
       {db && <div className="o-box" style={{ marginTop: 12 }}><BuyBox offers={db.offers} rates={rates} name={product.name} /></div>}
       <PriceCompare name={product.name} offers={product.offers} dbOffers={db?.offers} rates={rates} showTag={!db} />
       {db && <PriceChart offers={db.offers} />}
-      {db && <Reco keys={[db.pkey]} />}
+      {db && <Reco items={[{ pkey: db.pkey, name: product.name, genre: db.product?.genre }]} />}
 
       {totalReviews > 0 && (
         <section>
@@ -542,7 +542,7 @@ export default function Home() {
             <TodayStrip status={status} sheetEvents={saleEvents} onEdit={goSettings} />
             <SaleCalendarList sheetEvents={saleEvents} loaded={saleLoaded} />
             <TopPicks rates={effRates} />
-            <Reco mode="home" keys={viewHistory.filter((v) => v.inDb !== false).map((v) => v.key).slice(0, 3)} />
+            <Reco mode="home" items={viewHistory.slice(0, 3).map((v) => ({ pkey: v.key, name: v.name }))} />
             <Feed />
             <Strip title="最近見た商品" items={viewHistory} onOpen={(it) => openFromList({ jan: it.key, name: it.name, image: it.image })} />
             

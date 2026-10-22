@@ -6,6 +6,12 @@ import { NextResponse } from "next/server";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadCatalog } from "../../../lib/catalog";
 import { STORE_ORDER, STORE_META, statsFor, statsLabel, lotSuspects } from "../../../lib/priceView";
+import { conceptsOf } from "../../../lib/reco";
+
+// 定番に出さないもの
+const NICHE = /CD|DVD|Blu-?ray|ブルーレイ|e ?SIM|SIMカード|SIM ?フリー|ギフト券|ギフトカード|プリペイド|チケット|書籍|単行本|文庫|コミック|雑誌|ゲームソフト|ダウンロード版|オンラインコード|ソフトウェア|サブスク|会員|フィギュア|トレカ|カード ?ゲーム|ふるさと納税|中古|訳あり/i;
+// 種類があっても「定番」とは言いにくいもの(服・小物・アウトドア)
+const NOT_STAPLE = new Set(["watch", "watchcare", "wallet", "bag", "shoes", "apparel", "socks", "camp", "umbrella", "toy", "cattoy", "beer"]);
 
 export const revalidate = 1800;
 const PER_STORE = 50;
@@ -20,7 +26,8 @@ async function candidates(sb, store) {
   const out = { deal: [], trend: [], recommend: [] };
   const seen = { deal: new Set(), trend: new Set(), recommend: new Set() };
   const push = (k, list) => {
-    for (const x of list) if (!seen[k].has(x.pkey) && out[k].length < WANT) { seen[k].add(x.pkey); out[k].push(x); }
+    const cap = k === "recommend" ? WANT * 4 : WANT; // 定番は絞り込みで減るので多めに候補を持つ
+    for (const x of list) if (!seen[k].has(x.pkey) && out[k].length < cap) { seen[k].add(x.pkey); out[k].push(x); }
   };
   // お得
   for (const [minDays, ratio] of [[7, 0.92], [3, 0.95]]) {
@@ -43,13 +50,13 @@ async function candidates(sb, store) {
   {
     const { data } = await sb.from("offers").select("pkey, rank")
       .eq("store", store).not("rank", "is", null).gte("review_avg", 4).gte("review_count", 30).gte("updated_at", daysAgo(3))
-      .order("rank", { ascending: true }).limit(WANT);
+      .order("rank", { ascending: true }).limit(WANT * 4);
     push("recommend", (data || []).map((o) => ({ pkey: o.pkey, score: o.rank, rated: true })));
   }
-  if (out.recommend.length < WANT) {
+  if (out.recommend.length < WANT * 4) {
     const { data } = await sb.from("offers").select("pkey, rank")
       .eq("store", store).not("rank", "is", null).gte("updated_at", daysAgo(3))
-      .order("rank", { ascending: true }).limit(WANT * 2);
+      .order("rank", { ascending: true }).limit(WANT * 6);
     push("recommend", (data || []).map((o) => ({ pkey: o.pkey, score: o.rank, rated: false })));
   }
   return out;
@@ -76,13 +83,21 @@ export async function GET() {
     if (!e || !e.product) return null;
     // 定番でレビュー条件を使わなかったものは、有名ブランドだけ
     if (kind === "recommend" && !c.rated && !e.product.is_brand) return null;
+    // 定番は「ド定番」だけ:日用品・美容・食品・健康・家電・スマホ周り・キッチン・ベビー/ペットの種類に当てはまる商品
+    //   (CD・eSIM・ギフト券・本・ゲームソフトなどのニッチ・デジタル商品は出さない)
+    if (kind === "recommend") {
+      const text = `${e.product.name} ${e.product.genre || ""}`;
+      if (NICHE.test(text)) return null;
+      const cs = conceptsOf(e.product.name, e.product.genre).filter((id) => !NOT_STAPLE.has(id));
+      if (!cs.length) return null;
+    }
     const offers = {};
     let best = null;
     const sus = lotSuspects(e.offers);
     for (const s of STORE_ORDER) {
       const o = e.offers[s];
       if (!o) continue;
-      offers[s] = { price: o.price, point_rate: o.point_rate, sale_label: o.sale_label };
+      offers[s] = { price: o.price, point_rate: o.point_rate, sale_label: o.sale_label, at: o.updated_at };
       if (sus.has(s)) continue;
       if (!best || o.price < best.o.price) best = { s, o };
     }

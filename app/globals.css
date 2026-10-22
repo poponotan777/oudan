@@ -549,3 +549,15 @@ textarea.o-input { resize: vertical; line-height: 1.6; }
 .o-btn-danger:hover { background: var(--shu); color: #fff; }
 .o-btn.small { padding: 6px 12px; font-size: 12.5px; }
 .o-reset-box { margin-top: 20px; display: grid; gap: 10px; }
+.o-mini .at, .o-mini-rows .at, .o-tile .at { font-size: 10.5px; color: var(--ink-2); line-height: 1.3; }
+.o-mini-rows .at { padding: 0 6px; }
+.o-bigprice .at { font-size: 12px; margin-top: 4px; font-weight: 700; }
+.o-bigprice .at.small { font-weight: 500; font-size: 11px; line-height: 1.5; }
+.o-credit { margin-top: 10px; }
+/* クレジット表示は規定のHTMLのまま(サイトのリンクの色・余白を当てない) */
+.o-footer .o-credit a { all: revert; }
+.o-footer .o-credit { font-size: 13px; line-height: 2; }
+/* 楽天の決まり(商品画像の上に文字や装飾を入れない)に合わせ、ハートは画像の外(上)に置く */
+.o-tile:has(> .o-heart) { padding-top: 46px; }
+.o-tile > .o-heart { top: 6px; right: 6px; }
+.o-chart .ln.gap { stroke-dasharray: 5 5; opacity: .55; }

@@ -86,6 +86,16 @@ function Nav({ view, onNav, favN, className }) {
   );
 }
 
+const CREDITS = [
+  '<!-- Rakuten Web Services Attribution Snippet FROM HERE -->',
+  '<a href="https://developers.rakuten.com/" target="_blank">Supported by Rakuten Developers</a>',
+  '<!-- Rakuten Web Services Attribution Snippet TO HERE -->',
+  '<br>',
+  '<!-- Begin Yahoo! JAPAN Web Services Attribution Snippet -->',
+  '<span style="margin:15px 15px 15px 15px"><a href="https://developer.yahoo.co.jp/sitemap/">Webサービス by Yahoo! JAPAN</a></span>',
+  '<!-- End Yahoo! JAPAN Web Services Attribution Snippet -->',
+].join("");
+
 export function SiteFooter() {
   return (
     <footer className="o-footer">
@@ -97,6 +107,8 @@ export function SiteFooter() {
         【PR】オウダンは楽天アフィリエイト・バリューコマース・Amazonアソシエイトを利用しています。
         Amazonのアソシエイトとして、オウダンは適格販売により収入を得ています。
       </p>
+      {/* APIのクレジット表示(楽天ウェブサービス・Yahoo!デベロッパーネットワークの規定のHTMLをそのまま使う。色などは変えない) */}
+      <div className="o-credit" dangerouslySetInnerHTML={{ __html: CREDITS }} />
     </footer>
   );
 }

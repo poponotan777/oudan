@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadProduct } from "../../../lib/catalog";
 import { STORE_ORDER, statsFor, trustedOffers } from "../../../lib/priceView";
-import { ProductOG, ogFonts, imageData, OG_SIZE, jstStamp } from "../../../lib/og";
+import { ProductOG, ogFonts, imageData, OG_SIZE, jstStamp, rangeStamp } from "../../../lib/og";
 
 export const size = OG_SIZE;
 export const contentType = "image/png";
@@ -30,7 +30,7 @@ export default async function Image({ params }) {
     name: d?.product?.name || "商品",
     image: await imageData(d?.product?.image),
     prices,
-    date: newest ? jstStamp(newest) : jstStamp(),
+    date: rangeStamp(STORE_ORDER.map((s) => trustedOffers(d?.offers)[s]?.updated_at).filter(Boolean)),
     off: ok && st.diffPct <= -1 ? Math.round(-st.diffPct) : 0,
     lowest: !!(ok && st.isLowest),
   };

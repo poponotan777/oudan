@@ -1,7 +1,7 @@
 "use client";
 // 商品ページのいちばん上:どこで買うと安いか・いまは買い時か・すぐ買えるボタン
 //   煽らない:ここに出す数字は、オウダンが記録した値段とセールの予定からだけ作る
-import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay, trustedOffers } from "../../lib/priceView";
+import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay, trustedOffers, atLabel, AMAZON_DISCLAIMER } from "../../lib/priceView";
 import { upcomingSales, daysUntil } from "../../lib/saleCalendar";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
@@ -24,7 +24,9 @@ export default function BuyBox({ offers: raw, rates, name, onBuy }) {
   const best = [...list].sort((a, b) => a.eff - b.eff)[0];
   const worst = [...list].sort((a, b) => b.eff - a.eff)[0];
   const st = statsFor(best.o.price, best.o);
-  const v = verdict(st);
+  const v = best.s === "amazon" && !st
+    ? { tone: "none", word: "記録なし", why: "Amazonは規約により値段の記録を持てないため、買い時の目安は出せません。" }
+    : verdict(st);
   const ok = st && st.days >= 7;
   const off = ok && st.diffPct <= -1 ? Math.round(-st.diffPct) : 0;
   const gain = ok && st.median > best.o.price ? st.median - best.o.price : 0;
@@ -53,6 +55,8 @@ export default function BuyBox({ offers: raw, rates, name, onBuy }) {
             <div className="amt o-num"><span className="yen">¥</span>{num(best.o.price)}</div>
           </>
         )}
+        {best.o.updated_at && <div className="at">{atLabel(best.o.updated_at)}の価格{best.s === "amazon" ? "" : "(変わることがあります)"}</div>}
+        {best.s === "amazon" && <div className="at small">{AMAZON_DISCLAIMER}</div>}
         {(off > 0 || st?.isLowest) && (
           <div className="deals">
             {off > 0 && <span className="o-off">ふだんより<b className="o-num">{off}%</b>安い</span>}

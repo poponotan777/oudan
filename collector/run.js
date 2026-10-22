@@ -8,7 +8,7 @@
 // ============================================================
 
 import { appendFileSync } from "node:fs";
-import { Clock, log, rpc, rest, dbReady, jstDay, jstHour } from "./core.js";
+import { Clock, log, rpc, rest, dbReady, jstDay, jstHour, purgeAmazon } from "./core.js";
 import { runRakuten } from "./rakuten.js";
 import { runYahoo } from "./yahoo.js";
 import { runAmazon } from "./amazon.js";
@@ -61,6 +61,8 @@ async function main() {
   const stats = results.map((r, i) => (r.status === "fulfilled" ? r.value : { store: ["rakuten", "yahoo", "amazon"][i], note: "失敗: " + String(r.reason).slice(0, 200), requests: 0, written: 0, errors: 1 }));
 
   if (!dryRun) {
+    // Amazonのデータは24時間まで(Amazonの規約)。古い行と90日の記録を消す
+    try { const p = await purgeAmazon(); log(`Amazonの古い価格行を削除 ${p.deleted}件`); } catch (e) { log("Amazonの古い行の削除に失敗", String(e).slice(0, 200)); }
     // 他サイトにまだ無い商品を、次回探す予約に入れる
     try {
       const n = await rpc("enqueue_missing", { _limit: 20000 });

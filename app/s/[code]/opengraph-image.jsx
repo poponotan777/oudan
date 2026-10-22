@@ -1,7 +1,7 @@
 // 紹介ページの画像(1200×630)。テンプレートごとに描き分ける
 import { ImageResponse } from "next/og";
 import { loadShare } from "../../../lib/shareData";
-import { CollectionOG, PickOG, ogFonts, imageData, OG_SIZE, jstStamp } from "../../../lib/og";
+import { CollectionOG, PickOG, ogFonts, imageData, OG_SIZE, jstStamp, rangeStamp } from "../../../lib/og";
 
 export const size = OG_SIZE;
 export const contentType = "image/png";
@@ -14,11 +14,12 @@ const pricesOf = (it) => { const t = trustedOffers(it.offers); return Object.fro
 export default async function Image({ params }) {
   const { code } = await params;
   const d = await loadShare(code).catch(() => null);
-  const date = jstStamp();
+  let date = jstStamp();
   if (!d) {
     const fonts = await ogFonts("紹介ページが見つかりません");
     return new ImageResponse(<CollectionOG data={{ title: "紹介ページが見つかりません", template: "lineup", date, items: [] }} />, { ...OG_SIZE, fonts });
   }
+  date = rangeStamp(d.items.flatMap((it) => Object.values(trustedOffers(it.offers)).map((o) => o.updated_at)).filter(Boolean));
   if (d.tp === "pick") {
     const it = d.items[0];
     const data = { title: d.t || it.head || "", by: d.by, date, points: d.p, item: { name: it.name, head: it.head, image: await imageData(it.image), prices: pricesOf(it) } };

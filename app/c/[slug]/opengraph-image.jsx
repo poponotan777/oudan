@@ -15,7 +15,8 @@ export default async function Image({ params }) {
   const items = d ? await Promise.all(d.items.slice(0, 6).map(async (it) => {
     const now = {};
     for (const s of ["rakuten", "yahoo", "amazon"]) now[s] = it.offers[s]?.price ?? null;
-    const snap = it.snap && Object.values(it.snap).some((v) => v != null) ? it.snap : now;
+    // Amazonは今の価格(24時間以内のものだけ)を使う
+    const snap = it.snap && Object.values(it.snap).some((v) => v != null) ? { ...it.snap, amazon: now.amazon } : now;
     return { name: it.name, prices: snap, image: await imageData(it.image) };
   })) : [];
   const data = {

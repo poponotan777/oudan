@@ -41,7 +41,10 @@ export default function PriceChart({ offers }) {
       <h2 className="o-h2">値段の動き<small>{days}日分・1日ごとの最安値</small></h2>
       <div className="o-box o-chart">
         <div className="o-chart-legend">
-          {series.map(({ s }) => <span key={s}><i className={`dot ${s}`} />{STORE_META[s].short}</span>)}
+          {series.map(({ s, rows }) => {
+            const lt = Date.parse(rows[rows.length - 1].recorded_at);
+            return <span key={s}><i className={`dot ${s}`} />{STORE_META[s].short}{t1 - lt >= 86400000 ? `(${fmtDay(new Date(lt))}まで確認)` : ""}</span>;
+          })}
           <span className="o-chart-min">いちばん安かった日:<b className="o-num">¥{num(minRow.price)}</b>({fmtDay(minRow.recorded_at)}・{STORE_META[minRow.store].short})</span>
         </div>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="3サイトの値段の動きのグラフ" onMouseMove={onMove} onMouseLeave={() => setHover(null)} onTouchStart={(e) => onMove(e.touches[0] ? { currentTarget: e.currentTarget, clientX: e.touches[0].clientX } : e)}>
@@ -53,6 +56,13 @@ export default function PriceChart({ offers }) {
           {series.map(({ s, rows }) => (
             <polyline key={s} className={`ln ${s}`} fill="none" points={rows.map((r) => `${X(Date.parse(r.recorded_at)).toFixed(1)},${Y(r.price).toFixed(1)}`).join(" ")} />
           ))}
+          {/* 最後に確認した日より後は、点線でつなぐ(値段は確認していない) */}
+          {series.map(({ s, rows }) => {
+            const last = rows[rows.length - 1];
+            const lt = Date.parse(last.recorded_at);
+            if (t1 - lt < 86400000) return null;
+            return <line key={s + "-gap"} className={`ln gap ${s}`} x1={X(lt)} y1={Y(last.price)} x2={X(t1)} y2={Y(last.price)} />;
+          })}
           <circle cx={X(Date.parse(minRow.recorded_at))} cy={Y(minRow.price)} r="5" className="minpt" />
           <text x={PL} y={H - 6} className="ax">{fmtDay(new Date(t0))}</text>
           <text x={W - PR} y={H - 6} textAnchor="end" className="ax">{fmtDay(new Date(t1))}</text>

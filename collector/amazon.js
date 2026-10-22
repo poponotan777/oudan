@@ -12,7 +12,7 @@
 import { isSameProduct, normalizeName } from "../lib/merge.js";
 import { janKey } from "../lib/unitPrice.js";
 import { BRANDS } from "./brands.js";
-import { Pacer, Writer, log, rpc, cleanText, cleanName, enrich, NOISE, isJan, shortQuery, pickSame, describe } from "./core.js";
+import { Pacer, Writer, log, rpc, cleanText, cleanName, enrich, NOISE, isJan, shortQuery, pickSame, describe, staleList } from "./core.js";
 
 const API = "https://creatorsapi.amazon/catalog/v1";
 const MARKETPLACE = "www.amazon.co.jp";
@@ -168,10 +168,10 @@ async function brandSearch(pacer, writer, page) {
   return items;
 }
 
-async function fill(pacer, writer, n) {
+async function fill(pacer, writer, n, given = null) {
   if (!pacer.canGo()) return { tried: 0, found: 0 };
-  let list = [];
-  try { list = (await rpc("take_fill", { _store: "amazon", _n: n })) || []; } catch (e) { log("[Amazon] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  let list = given || [];
+  if (!given) try { list = (await rpc("take_fill", { _store: "amazon", _n: n })) || []; } catch (e) { log("[Amazon] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
   const results = [];
   let found = 0;
   // 1) ASINが分かっている商品は10件ずつまとめて取り直す
@@ -214,8 +214,16 @@ async function fill(pacer, writer, n) {
     await writer.flushIfFull();
   }
   await writer.flush();
-  try { await rpc("fill_done", { _items: results }); } catch {}
+  if (!given) try { await rpc("fill_done", { _items: results }); } catch {}
   return { tried: results.length, found };
+}
+
+// 値段が古くなった商品を取り直す(v30)。ランキングに出なくなった商品も、売れている順に更新し続ける
+async function refresh(pacer, writer, n, olderHours) {
+  if (!pacer.canGo() || !(n > 0)) return { tried: 0, found: 0 };
+  let list = [];
+  try { list = await staleList("amazon", n, olderHours); } catch (e) { log("[Amazon] 取り直しの候補を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  return fill(pacer, writer, n, list);
 }
 
 export async function runAmazon({ clock, slot, day, noNew, dryRun }) {
@@ -229,8 +237,10 @@ export async function runAmazon({ clock, slot, day, noNew, dryRun }) {
     if (slot === "fill") {
       // 補完だけの回(v24):回数と残り時間の両方で上限
       const byTime = Math.floor((clock.left() - 30000) / pacer.interval);
+      // Amazonは24時間しか持てないので、18時間より前に取った商品を先に取り直す(10件で1回)
+      const rf = await refresh(pacer, writer, Number(process.env.AMAZON_REFRESH_FILL || 3000), 18);
       const f = await fill(pacer, writer, Math.max(0, Math.min(Number(process.env.AMAZON_FILL_ONLY || 2000), byTime)));
-      stat.note = `補完だけの回 ${f.found}/${f.tried}件`;
+      stat.note = `補完だけの回 取り直し ${rf.found}/${rf.tried}件・補完 ${f.found}/${f.tried}件`;
       throw { done: true };
     }
     // 補完に回す分を残して、ブランド検索に使う
@@ -240,8 +250,9 @@ export async function runAmazon({ clock, slot, day, noNew, dryRun }) {
     await writer.flush();
     pacer.maxRequests = max;
     if (pacer.stopReason === "1日の上限回数に達した") { pacer.stopped = false; pacer.stopReason = ""; }
+    const rf = await refresh(pacer, writer, Number(process.env.AMAZON_REFRESH || 2000), 18);
     const f = await fill(pacer, writer, Number(process.env.AMAZON_FILL || 400));
-    stat.note = `補完 ${f.found}/${f.tried}件`;
+    stat.note = `取り直し ${rf.found}/${rf.tried}件・補完 ${f.found}/${f.tried}件`;
   } catch (e) {
     if (!e || !e.done) {
       stat.note = "エラー: " + String(e).slice(0, 200);

@@ -22,7 +22,8 @@ async function snapshotPrices(sb, keys) {
   for (const k of keys) {
     const t = canon[k] || k;
     const prices = { rakuten: null, yahoo: null, amazon: null };
-    for (const o of (offers || []).filter((x) => x.pkey === t)) prices[o.store] = o.price;
+    // Amazonの価格は24時間までしか持てないので、まとめの「作成時の価格」には残さない
+    for (const o of (offers || []).filter((x) => x.pkey === t)) if (o.store !== "amazon") prices[o.store] = o.price;
     out[k] = { key: t, prices };
   }
   return out;

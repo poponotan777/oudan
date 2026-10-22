@@ -1,7 +1,7 @@
 "use client";
 // トップの「お得・急上昇・おすすめ」(v25)— タップで商品ページ(/p/…)へ
 import { useEffect, useState } from "react";
-import { productPath, STORE_ORDER, STORE_META, effectivePrice, lotSuspects } from "../../lib/priceView";
+import { productPath, STORE_ORDER, STORE_META, effectivePrice, lotSuspects, atLabel } from "../../lib/priceView";
 import Heart from "./Heart";
 
 const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
@@ -24,6 +24,7 @@ function Rows({ offers, rates }) {
           </div>
         );
       })}
+      {offers.amazon?.at && <div className="at">Amazonは{atLabel(offers.amazon.at)}</div>}
     </div>
   );
 }
