@@ -376,3 +376,66 @@ export async function purgeAmazon({ dryRun = false } = {}) {
   }
   return { deleted: keys.length };
 }
+
+// ============================================================
+// トップ・おすすめに出ている商品(v33)— 見られる商品から先に、値段を新しくし、3サイトをそろえる
+//   ・サイトの /api/top(いま見ておきたいもの 最大450件)と、おすすめ用の一覧(concept_picks)から集める
+//   ・そのサイトの値段が olderHours より古い → 取り直し(商品コードで)
+//   ・そのサイトにまだ無い → 名前・JANで探す(見つからなかった商品は fill_queue の待ち時間に従って間をあける)
+//   ・並び順は、トップに出ている順(上ほど先)
+// ============================================================
+let focusKeysP = null;
+async function focusKeys() {
+  if (!focusKeysP) focusKeysP = (async () => {
+    const keys = [];
+    const site = (process.env.SITE_ORIGIN || "").replace(/\/$/, "");
+    if (site) {
+      try {
+        const j = await (await fetch(`${site}/api/top`)).json();
+        // 3つの欄を交互に(どれも上のほうから)
+        const lists = ["deal", "trend", "recommend"].map((k) => (j?.[k] || []).map((x) => x.pkey));
+        for (let i = 0; i < 150; i++) for (const l of lists) if (l[i]) keys.push(l[i]);
+      } catch (e) { log("トップの商品を読めません", String(e).slice(0, 120)); }
+    }
+    try {
+      const rows = await rest("concept_picks?select=pkeys") || [];
+      for (let i = 0; i < 12; i++) for (const r of rows) if (r.pkeys?.[i]) keys.push(r.pkeys[i]);
+    } catch {}
+    return [...new Set(keys)];
+  })();
+  return focusKeysP;
+}
+
+export async function focusList(store, { n = 300, olderHours = 20 } = {}) {
+  const keys = await focusKeys();
+  if (!keys.length || !(n > 0)) return [];
+  const since = Date.now() - olderHours * 3600 * 1000;
+  const nowIso = encodeURIComponent(new Date().toISOString());
+  const have = new Map();
+  const wait = new Set();
+  const prod = new Map();
+  for (let i = 0; i < keys.length; i += 80) {
+    const part = encodeURIComponent(inList(keys.slice(i, i + 80)));
+    const [of, fq, pr] = await Promise.all([
+      rest(`offers?select=pkey,code,updated_at&store=eq.${store}&pkey=${part}`),
+      rest(`fill_queue?select=pkey&store=eq.${store}&next_at=gt.${nowIso}&pkey=${part}`).catch(() => []),
+      rest(`products?select=pkey,name,jan,merged_into&pkey=${part}`),
+    ]);
+    for (const o of of || []) have.set(o.pkey, o);
+    for (const q of fq || []) wait.add(q.pkey);
+    for (const p of pr || []) prod.set(p.pkey, p);
+  }
+  const out = [];
+  for (const k of keys) {
+    if (out.length >= n) break;
+    const p = prod.get(k);
+    if (!p || p.merged_into) continue;
+    const o = have.get(k);
+    if (o) {
+      if (Date.parse(o.updated_at) < since) out.push({ pkey: k, name: p.name, jan: p.jan, code: o.code || null });
+    } else if (!wait.has(k)) {
+      out.push({ pkey: k, name: p.name, jan: p.jan, code: null });
+    }
+  }
+  return out;
+}

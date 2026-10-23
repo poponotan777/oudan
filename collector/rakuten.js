@@ -14,7 +14,7 @@ import { BRANDS } from "./brands.js";
 import { RAKUTEN_FALLBACK_GENRES, RAKUTEN_SKIP_GENRE } from "./genres.js";
 import {
   Pacer, Writer, log, rpc, getState, setState, cleanText, cleanName, enrich, jstToIso,
-  NOISE, shortQuery, pickSame, describe, staleList } from "./core.js";
+  NOISE, shortQuery, pickSame, describe, staleList, focusList } from "./core.js";
 
 const RANK_URL = "https://openapi.rakuten.co.jp/ichibaranking/api/IchibaItem/Ranking/20220601";
 const GENRE_URL = "https://openapi.rakuten.co.jp/ichibagt/api/IchibaGenre/Search/20260701";
@@ -153,7 +153,7 @@ async function brandSearch(pacer, writer, brands) {
 }
 
 // 他サイトで見つかった商品を、楽天でも探す
-async function fill(pacer, writer, n, given = null) {
+async function fill(pacer, writer, n, given = null, { report = false } = {}) {
   if (!pacer.canGo()) return { tried: 0, found: 0 };
   let list = given || [];
   if (!given) try { list = (await rpc("take_fill", { _store: "rakuten", _n: n })) || []; } catch (e) { log("[楽天] 補完の予約を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
@@ -184,7 +184,7 @@ async function fill(pacer, writer, n, given = null) {
     await writer.flushIfFull();
   }
   await writer.flush();
-  if (!given) try { await rpc("fill_done", { _items: results }); } catch {}
+  if (!given || report) try { await rpc("fill_done", { _items: results }); } catch {}
   return { tried: results.length, found };
 }
 
@@ -194,6 +194,16 @@ async function refresh(pacer, writer, n, olderHours) {
   let list = [];
   try { list = await staleList("rakuten", n, olderHours); } catch (e) { log("[楽天] 取り直しの候補を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
   return fill(pacer, writer, n, list);
+}
+
+// トップ・おすすめに出ている商品を先に(v33):値段が20時間より古ければ取り直し、まだ無ければこのサイトで探す
+async function focus(pacer, writer, n) {
+  if (!pacer.canGo() || !(n > 0)) return { tried: 0, found: 0 };
+  let list = [];
+  try { list = await focusList("rakuten", { n, olderHours: 20 }); } catch (e) { log("[楽天] 優先する商品を読めません", String(e).slice(0, 120)); return { tried: 0, found: 0 }; }
+  const r = await fill(pacer, writer, n, list, { report: true });
+  log(`[楽天] トップ・おすすめの商品 ${r.found}/${r.tried}件`);
+  return r;
 }
 
 export async function runRakuten({ clock, slot, day, noNew, dryRun }) {
@@ -207,9 +217,11 @@ export async function runRakuten({ clock, slot, day, noNew, dryRun }) {
       // 補完だけの回(v24):残り時間で回せる件数だけ予約から取り出す
       const n = Math.min(Number(process.env.RAKUTEN_FILL_ONLY || 3000), Math.floor((clock.left() - 30000) / pacer.interval));
       // 半分は「値段が古くなった商品の取り直し」、残りで補完(v30)
-      const rf = await refresh(pacer, writer, Math.floor(Math.max(n, 0) / 2), 36);
-      const f = await fill(pacer, writer, Math.max(n - rf.tried, 0));
-      stat.note = `補完だけの回 取り直し ${rf.found}/${rf.tried}件・補完 ${f.found}/${f.tried}件`;
+      const fo = await focus(pacer, writer, Math.min(Number(process.env.RAKUTEN_FOCUS || 300), Math.max(n, 0)));
+      const rest = Math.max(n - fo.tried, 0);
+      const rf = await refresh(pacer, writer, Math.floor(rest / 2), 36);
+      const f = await fill(pacer, writer, Math.max(rest - rf.tried, 0));
+      stat.note = `補完だけの回 トップ ${fo.found}/${fo.tried}件・取り直し ${rf.found}/${rf.tried}件・補完 ${f.found}/${f.tried}件`;
       return await finish();
     }
     const genres = await loadGenres(pacer);
@@ -227,9 +239,10 @@ export async function runRakuten({ clock, slot, day, noNew, dryRun }) {
     const half = BRANDS.slice(0, Number(process.env.BRAND_LIMIT || BRANDS.length)).filter((_, i) => i % 2 === (am ? 0 : 1));
     stat.items += await brandSearch(pacer, writer, half);
     await writer.flush();
+    const fo = await focus(pacer, writer, Number(process.env.RAKUTEN_FOCUS || 300));
     const f = await fill(pacer, writer, Number(process.env.RAKUTEN_FILL || 400));
     const rf = await refresh(pacer, writer, Number(process.env.RAKUTEN_REFRESH || 300), 36);
-    stat.note = `補完 ${f.found}/${f.tried}件・取り直し ${rf.found}/${rf.tried}件`;
+    stat.note = `トップ ${fo.found}/${fo.tried}件・補完 ${f.found}/${f.tried}件・取り直し ${rf.found}/${rf.tried}件`;
   } catch (e) {
     stat.note = "エラー: " + String(e).slice(0, 200);
     log("[楽天]", stat.note);
