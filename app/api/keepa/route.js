@@ -19,5 +19,5 @@ export async function GET(req) {
       if (a?.hist_src === "keepa") stats[k] = Object.fromEntries(FIELDS.map((f) => [f, a[f] ?? null]));
     }
   }
-  return NextResponse.json({ stats }, { headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=600" } });
+  return NextResponse.json({ stats }, { headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=86400" } });
 }

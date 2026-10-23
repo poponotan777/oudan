@@ -34,6 +34,6 @@ export async function GET(req) {
   // お買い得のときは、安くなった割合の大きい順
   if (kind === "drop") items.sort((a, b) => b.off - a.off);
   return NextResponse.json({ kind, page, items, more: keys.length === PER }, {
-    headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=600" },
+    headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=86400" },
   });
 }

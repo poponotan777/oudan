@@ -54,5 +54,5 @@ export async function GET(req) {
       db: e,
     });
   });
-  return NextResponse.json({ q, items }, { headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=600" } });
+  return NextResponse.json({ q, items }, { headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=86400" } });
 }

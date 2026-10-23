@@ -56,6 +56,6 @@ export async function GET(req) {
   }))).filter(Boolean);
 
   return NextResponse.json({ concepts, simLabel, similar, groups }, {
-    headers: { "Cache-Control": "s-maxage=3600, stale-while-revalidate=1800" },
+    headers: { "Cache-Control": "s-maxage=3600, stale-while-revalidate=86400" },
   });
 }

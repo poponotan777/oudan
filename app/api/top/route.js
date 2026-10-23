@@ -143,7 +143,8 @@ export async function GET() {
         const it = build(c.pkey, kind, s, c);
         if (it && !l.some((x) => x.pkey === it.pkey)) l.push(it);
       }
-      return l;
+      // 2サイト以上で値段がそろっている商品を先に(比べられる商品を上に・v32)。順番はそのまま
+      return [...l.filter((x) => x.stores >= 2), ...l.filter((x) => x.stores < 2)];
     });
     const seen = new Set();
     const out = [];
@@ -158,5 +159,5 @@ export async function GET() {
     trend: pick("trend"),
     recommend: pick("recommend"),
     updatedAt: new Date().toISOString(),
-  }, { headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=600" } });
+  }, { headers: { "Cache-Control": "s-maxage=1800, stale-while-revalidate=86400" } });
 }

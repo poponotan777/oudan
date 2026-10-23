@@ -100,7 +100,7 @@ function Categories({ onPick }) {
         {CATEGORIES.map((c) => (
           <button key={c.id} className="o-cat" aria-expanded={open === c.id} onClick={() => setOpen(open === c.id ? null : c.id)}>
             <span className="o-cat-icon" style={{ background: c.tint }} aria-hidden="true">{c.icon}</span>
-            <span className="o-cat-name">{c.name}</span>
+            <span className="o-cat-name">{c.name.split("・").map((t, i, all) => <span key={i}>{t}{i < all.length - 1 ? <>・<wbr /></> : null}</span>)}</span>
           </button>
         ))}
       </div>

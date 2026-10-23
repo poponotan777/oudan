@@ -565,3 +565,22 @@ textarea.o-input { resize: vertical; line-height: 1.6; }
 /* v31:Keepaの出典 */
 .o-credit-note { margin-top: 8px; font-size: 11px; color: var(--ink-2); }
 .o-credit-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* v32:読み込み中の形 */
+.o-skel-rail { display: flex; gap: 10px; overflow: hidden; }
+.o-skel { height: 230px; background: linear-gradient(90deg, var(--line) 0%, var(--paper) 50%, var(--line) 100%); background-size: 200% 100%; animation: o-skel 1.2s ease-in-out infinite; border: none; }
+@keyframes o-skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .o-skel { animation: none; } }
+
+/* v32:読み進めたらヘッダーを低く・カテゴリ名は「・」の後ろで折り返す */
+.o-header .o-header-row, .o-header .o-search { transition: padding .15s ease; }
+.o-header.is-small .o-lede { display: none; }
+.o-header.is-small .o-header-row { padding: 6px 0 4px; }
+.o-header.is-small .o-search { padding-bottom: 8px; }
+.o-header.is-small .o-search input { padding-top: 9px; padding-bottom: 9px; }
+@media (max-width: 899px) { .o-header.is-small .o-header-row { display: none; } .o-header.is-small .o-search { padding-top: 8px; } }
+.o-cat-name { word-break: keep-all; }
+/* v32:長いバッジ(「Amazonで中央値より52%安い」など)で2列が画面からはみ出さないように */
+.o-pgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 900px) { .o-pgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.o-tile .o-mark { white-space: normal; }

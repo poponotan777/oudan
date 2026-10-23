@@ -35,6 +35,14 @@ function NavIcon({ k }) {
 export function SiteHeader({ view, onNav, query, setQuery, onSearch, lede = true }) {
   const [favN, setFavN] = useState(0);
   const [q, setQ] = useState("");
+  // 下に読み進めたら、ヘッダーを低くして画面を広く使う(v32)。行ったり来たりしないよう、出す・しまうの位置をずらす
+  const [small, setSmall] = useState(false);
+  useEffect(() => {
+    const on = () => setSmall((v) => (v ? window.scrollY > 10 : window.scrollY > 90));
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
   useEffect(() => {
     setFavN(loadFavorites().length);
     return onFavoritesChange((l) => setFavN(l.length));
@@ -47,7 +55,7 @@ export function SiteHeader({ view, onNav, query, setQuery, onSearch, lede = true
     else if (val.trim()) window.location.href = `/?q=${encodeURIComponent(val.trim())}`;
   };
   return (
-    <header className="o-header">
+    <header className={`o-header${small ? " is-small" : ""}`}>
       <div className="o-wrap">
         <div className="o-header-row">
           {onNav
@@ -56,7 +64,7 @@ export function SiteHeader({ view, onNav, query, setQuery, onSearch, lede = true
           <Nav view={view} onNav={onNav} favN={favN} className="o-nav" />
         </div>
         <form className="o-search" onSubmit={submit} role="search">
-          <input value={val} onChange={(e) => setVal(e.target.value)} placeholder="商品名で探す(例:シャンプー、モバイルバッテリー)" enterKeyHint="search" aria-label="商品名" />
+          <input value={val} onChange={(e) => setVal(e.target.value)} placeholder="商品名で探す(例:シャンプー)" enterKeyHint="search" aria-label="商品名" />
           <button type="submit">探す</button>
         </form>
         {lede && <p className="o-lede">楽天・Yahoo!ショッピング・Amazonの値段を、あなたのポイント込みで比べます</p>}
