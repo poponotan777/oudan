@@ -44,16 +44,23 @@ async function main() {
   // 容量チェック(危なければ新しい商品は増やさず、今ある商品の価格だけ更新)
   let noNew = false;
   if (!dryRun) {
-    try {
-      const u = await rpc("db_usage", {});
+    // 容量の確認が混雑で時間切れになっても、取得は続ける(v34)。つながらないとき(キー違いなど)だけ止める
+    let u = null, err = null;
+    for (let i = 0; i < 3 && !u; i++) {
+      try { u = await rpc("db_usage", {}); } catch (e) { err = e; if (i < 2) await new Promise((r) => setTimeout(r, 15000)); }
+    }
+    if (u) {
       const bytes = Number(u?.db_bytes || 0);
       log(`DB容量 ${(bytes / MB).toFixed(1)}MB / 商品 ${u?.products} / 価格行 ${u?.offers} / 補完待ち ${u?.queue}`);
       if (bytes > STOP_BYTES) {
         noNew = true;
         log(`容量が ${process.env.DB_STOP_MB || 450}MB を超えているため、新しい商品は追加しません`);
       }
-    } catch (e) {
-      console.log("::error::DBに接続できません。v18のSQLを実行したか、URLとキーを確認してください: " + String(e).slice(0, 200));
+    } else if (/57014|statement timeout|HTTP 5\d\d/.test(String(err))) {
+      console.log("::warning::DB容量の確認が混雑で時間切れになりました。新しい商品は増やさず、今ある商品の更新だけ続けます: " + String(err).slice(0, 160));
+      noNew = true;
+    } else {
+      console.log("::error::DBに接続できません。v18のSQLを実行したか、URLとキーを確認してください: " + String(err).slice(0, 200));
       process.exit(1);
     }
   }
