@@ -216,8 +216,10 @@ export class Writer {
     if (this.buf.length === 0) return;
     const chunk = this.buf.splice(0, this.buf.length);
     if (this.dryRun) { this.written += chunk.length; return; }
-    for (let i = 0; i < chunk.length; i += 500) {
-      const part = chunk.slice(i, i + 500);
+    // 1回の書き込みは250件ずつ(1回が長いと時間切れでまとめて失敗するため・v35)
+    const size = Number(process.env.WRITE_CHUNK || 250);
+    for (let i = 0; i < chunk.length; i += size) {
+      const part = chunk.slice(i, i + size);
       try {
         const n = await rpc("record_offers", { _rows: part, _day: this.day, _no_new: this.noNew });
         this.written += typeof n === "number" ? n : part.length;
