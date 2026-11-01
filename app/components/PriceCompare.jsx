@@ -7,7 +7,7 @@
 // ============================================================
 
 import {
-  STORE_ORDER, STORE_META, yen, statsFor, statsLabel, effectivePrice, extraPointPct,
+  STORE_ORDER, STORE_META, yen, statsFor, storeStats, statsLabel, effectivePrice, extraPointPct,
   fmtTime, fmtDay, searchUrl, lotSuspects, suspectText, AMAZON_DISCLAIMER, atLabel,
 } from "../../lib/priceView";
 
@@ -28,7 +28,7 @@ export function buildRows({ offers = [], dbOffers = {} }) {
       sale_label: base.sale_label ?? db?.sale_label ?? null,
       sale_until: base.sale_until ?? db?.sale_until ?? null,
       updated_at: base.fromDb ? (base.updated_at || db?.updated_at) : null,
-      stats: statsFor(base.price, db),
+      stats: s === "amazon" ? storeStats("amazon", base.price, dbOffers) : statsFor(base.price, db),
     };
     tmp[s] = rows[s];
   }
@@ -133,7 +133,7 @@ export default function PriceCompare({ name, offers, dbOffers, rates, onBuy, tit
         })}
       </div>
       {note && <p className="o-note" style={{ marginTop: 8 }}>
-        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です{rows.amazon?.stats && dbOffers?.amazon?.hist_src === "keepa" ? "(Amazonの記録はKeepaのデータをもとに作成)" : "(Amazonは記録がないため出しません)"}。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
+        「ふだん」は90日の中央値。オウダンが毎日記録した各サイトの価格から出した目安です(Amazonは値段の記録を持たないため、いまの値段を楽天・Yahoo!の記録と比べています)。価格は変わることがあるので、買う前に各サイトで確かめてください。【PR】購入リンクはアフィリエイトリンクです。
       </p>}
       {rows.amazon && <p className="o-note" style={{ marginTop: 4 }}>{AMAZON_DISCLAIMER}</p>}
     </section>

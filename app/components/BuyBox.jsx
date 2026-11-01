@@ -1,7 +1,7 @@
 "use client";
 // 商品ページのいちばん上:どこで買うと安いか・いまは買い時か・すぐ買えるボタン
 //   煽らない:ここに出す数字は、オウダンが記録した値段とセールの予定からだけ作る
-import { STORE_ORDER, STORE_META, effectivePrice, statsFor, fmtTime, fmtDay, trustedOffers, atLabel, AMAZON_DISCLAIMER } from "../../lib/priceView";
+import { STORE_ORDER, STORE_META, effectivePrice, statsFor, storeStats, fmtTime, fmtDay, trustedOffers, atLabel, AMAZON_DISCLAIMER } from "../../lib/priceView";
 import { upcomingSales, daysUntil } from "../../lib/saleCalendar";
 import { KEEPA_CREDIT, KEEPA_URL } from "../../lib/keepa";
 
@@ -11,11 +11,13 @@ const num = (n) => Math.round(Number(n)).toLocaleString("ja-JP");
 export function verdict(st) {
   if (!st || st.days < 7) return { tone: "none", word: "記録を集めています", why: "値段の記録が7日分たまると、買い時の目安を出します。" };
   const d = st.diffPct;
-  if (st.isLowest) return { tone: "best", word: "買い時", why: `${st.days}日の記録でいちばん安い値段です。` };
-  if (d <= -5 || (st.rank <= 2 && d < 0)) return { tone: "good", word: "買い時", why: `ふだん(中央値)より${Math.abs(d).toFixed(0)}%安く、${st.days}日で${st.rank}番目に安い値段です。` };
-  if (d <= -1) return { tone: "ok", word: "やや安い", why: `ふだんより${Math.abs(d).toFixed(1)}%安い値段です。` };
+  // Amazon(st.ref)は、楽天・Yahoo!の記録と比べた目安
+  const w = st.ref ? "楽天・Yahoo!の" : "";
+  if (st.isLowest) return { tone: "best", word: "買い時", why: `${w}${st.days}日の記録のどの日よりも安い値段です。` };
+  if (d <= -5 || (st.rank <= 2 && d < 0)) return { tone: "good", word: "買い時", why: `${w}ふだん(中央値)より${Math.abs(d).toFixed(0)}%安く、${w}${st.days}日の記録で${st.rank}番目に安い値段です。` };
+  if (d <= -1) return { tone: "ok", word: "やや安い", why: `${w}ふだんより${Math.abs(d).toFixed(1)}%安い値段です。` };
   if (d < 1) return { tone: "flat", word: "ふだんの値段", why: "急ぎでなければ、セールを待つのも手です。" };
-  return { tone: "high", word: "いまは高め", why: `ふだんより${d.toFixed(0)}%高い値段です。値下がりを待つのがおすすめです。` };
+  return { tone: "high", word: "いまは高め", why: `${w}ふだんより${d.toFixed(0)}%高い値段です。値下がりを待つのがおすすめです。` };
 }
 
 export default function BuyBox({ offers: raw, rates, name, onBuy }) {
@@ -24,9 +26,9 @@ export default function BuyBox({ offers: raw, rates, name, onBuy }) {
   if (!list.length) return null;
   const best = [...list].sort((a, b) => a.eff - b.eff)[0];
   const worst = [...list].sort((a, b) => b.eff - a.eff)[0];
-  const st = statsFor(best.o.price, best.o);
+  const st = storeStats(best.s, best.o.price, offers);
   const v = best.s === "amazon" && !st
-    ? { tone: "none", word: "記録なし", why: "Amazonの値段の記録がないため、買い時の目安は出せません。" }
+    ? { tone: "none", word: "記録なし", why: "比べる楽天・Yahoo!の値段の記録がないため、買い時の目安は出せません。" }
     : verdict(st);
   const ok = st && st.days >= 7;
   const off = ok && st.diffPct <= -1 ? Math.round(-st.diffPct) : 0;
@@ -59,9 +61,9 @@ export default function BuyBox({ offers: raw, rates, name, onBuy }) {
         {best.s === "amazon" && <div className="at small">{AMAZON_DISCLAIMER}</div>}
         {(off > 0 || st?.isLowest) && (
           <div className="deals">
-            {off > 0 && <span className="o-off">ふだんより<b className="o-num">{off}%</b>安い</span>}
+            {off > 0 && <span className="o-off">{st.ref ? "楽天・Yahoo!の" : ""}ふだんより<b className="o-num">{off}%</b>安い</span>}
             {gain > 0 && <span className="o-gain"><b className="o-num">¥{num(gain)}</b>おトク</span>}
-            {st?.isLowest && st.days >= 7 && <span className="o-low">{st.days}日でいちばん安い</span>}
+            {st?.isLowest && st.days >= 7 && <span className="o-low">{st.ref ? "楽天・Yahoo!の" : ""}{st.days}日でいちばん安い</span>}
           </div>
         )}
       </div>

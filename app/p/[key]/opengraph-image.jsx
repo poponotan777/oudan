@@ -2,7 +2,7 @@
 import { ImageResponse } from "next/og";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadProduct } from "../../../lib/catalog";
-import { STORE_ORDER, statsFor, trustedOffers } from "../../../lib/priceView";
+import { STORE_ORDER, statsFor, storeStats, trustedOffers } from "../../../lib/priceView";
 import { ProductOG, ogFonts, imageData, OG_SIZE, jstStamp, rangeStamp } from "../../../lib/og";
 
 export const size = OG_SIZE;
@@ -17,14 +17,14 @@ export default async function Image({ params }) {
   let d = await loadProduct(publicDb(), k).catch(() => null);
   if (d?.redirectTo) d = await loadProduct(publicDb(), d.redirectTo).catch(() => null);
   const prices = {};
-  let newest = null, best = null;
+  let newest = null, best = null, bestS = null;
   for (const s of STORE_ORDER) {
     const o = trustedOffers(d?.offers)[s];
     prices[s] = o?.price ?? null;
     if (o?.updated_at && (!newest || o.updated_at > newest)) newest = o.updated_at;
-    if (o && (!best || o.price < best.price)) best = o;
+    if (o && (!best || o.price < best.price)) { best = o; bestS = s; }
   }
-  const st = best ? statsFor(best.price, best) : null;
+  const st = best ? storeStats(bestS, best.price, trustedOffers(d?.offers)) : null;
   const ok = st && st.days >= 7;
   const data = {
     name: d?.product?.name || "商品",

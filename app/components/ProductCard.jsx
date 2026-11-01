@@ -17,7 +17,7 @@ export default function ProductCard({ c }) {
       </div>
       <div className="was">
         <span className={`s-${c.store}`} style={{ fontWeight: 900 }}>{STORE_META[c.store]?.short}</span>
-        {c.lowest ? <b style={{ color: "var(--wakaba)", marginLeft: 6 }}>3か月で最安</b> : c.median && c.off > 0 ? <span style={{ marginLeft: 6 }}>ふだん¥{num(c.median)}</span> : null}
+        {c.lowest ? <b style={{ color: "var(--wakaba)", marginLeft: 6 }}>{c.ref ? "楽天・Yahoo!の3か月より安い" : "3か月で最安"}</b> : c.median && c.off > 0 ? <span style={{ marginLeft: 6 }}>{c.ref ? "楽天・Yahoo!のふだん" : "ふだん"}¥{num(c.median)}</span> : null}
         {c.stores >= 2 && <span style={{ marginLeft: 6 }}>{c.stores}サイト比較</span>}
       </div>
       {c.store === "amazon" && c.at && <div className="at">{atLabel(c.at)}の価格</div>}

@@ -15,7 +15,7 @@ import { loadStatus, saveStatus, ratesForPrice } from "../lib/status";
 import { AMAZON_AFFILIATE_ON } from "../lib/featureFlags";
 import { loadCatalog, augmentProduct } from "../lib/catalog";
 import { withKeepa } from "../lib/keepaClient";
-import { statsFor, statsLabel, productPath, STORE_META, effectivePrice, displayName } from "../lib/priceView";
+import { statsFor, storeStats, statsLabel, productPath, STORE_META, effectivePrice, displayName } from "../lib/priceView";
 import { painsForProduct, displayCatch } from "../lib/pains";
 import { CATEGORIES } from "../lib/categories";
 import { loadFavorites, onFavoritesChange, removeFavorite } from "../lib/favorites";
@@ -257,7 +257,7 @@ function ResultItem({ p, rates, onOpen }) {
   const best = [...p.offers].sort((a, b) => effectivePrice(a.store, a, rates) - effectivePrice(b.store, b, rates))[0];
   const eff = effectivePrice(best.store, best, rates);
   const unit = unitPriceLabel(best.price, p.name);
-  const st = statsFor(best.price, p.db?.offers?.[best.store]);
+  const st = storeStats(best.store, best.price, p.db?.offers || {});
   const lab = statsLabel(st);
   const pkey = pkeyOf(p);
   return (

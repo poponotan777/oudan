@@ -57,5 +57,6 @@ jobs:
           AMAZON_CLIENT_SECRET: ${{ secrets.AMAZON_CLIENT_SECRET }}
           AMAZON_CREDENTIAL_VERSION: "3.3"
           AMAZON_PARTNER_TAG: popo-kaiteki-22
-          # Keepa(Amazonの値段の記録)。Amazonの別途合意が取れてから Secrets に入れる(無い間は何もしない)
-          KEEPA_KEY: ${{ secrets.KEEPA_KEY }}
+          # Keepa(Amazonの値段の記録)は使わない(v36:Amazonの別途合意が得られないため。
+          #   Amazonは楽天・Yahoo!の記録と比べる)。使うときは Amazonアソシエイトをやめてから下の行を戻す
+          # KEEPA_KEY: ${{ secrets.KEEPA_KEY }}

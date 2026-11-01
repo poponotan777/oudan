@@ -8,7 +8,7 @@
 import { notFound } from "next/navigation";
 import { COLLECTIONS_ON } from "../../../lib/featureFlags";
 import { loadCollection } from "../../../lib/collectionData";
-import { STORE_ORDER, STORE_META, yen, fmtTime, productPath, statsFor, statsLabel } from "../../../lib/priceView";
+import { STORE_ORDER, STORE_META, yen, fmtTime, productPath, statsFor, storeStats, statsLabel } from "../../../lib/priceView";
 import { painsForProduct } from "../../../lib/pains";
 import { SITE } from "../../../lib/supabaseServer";
 
@@ -52,7 +52,7 @@ function PriceTable({ it }) {
         const meta = STORE_META[s];
         const on = s === best;
         const snap = it.snap?.[s];
-        const lab = o ? statsLabel(statsFor(o.price, o)) : null;
+        const lab = o ? statsLabel(storeStats(s, o.price, it.offers)) : null;
         return (
           <div key={s} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, border: on ? `1.5px solid ${meta.color}` : "1px solid #E2E8F0", background: on ? "#F0FDF6" : "#fff" }}>
             <div style={{ width: 58, fontSize: 12, fontWeight: 800, color: meta.color }}>

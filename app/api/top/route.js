@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { publicDb } from "../../../lib/supabaseServer";
 import { loadCatalog } from "../../../lib/catalog";
-import { STORE_ORDER, STORE_META, statsFor, statsLabel, lotSuspects } from "../../../lib/priceView";
+import { STORE_ORDER, STORE_META, statsFor, storeStats, statsLabel, lotSuspects } from "../../../lib/priceView";
 import { conceptsOf } from "../../../lib/reco";
 import { keepaDeals } from "../../../lib/keepaServer";
 
@@ -110,7 +110,7 @@ export async function GET() {
     }
     if (!best) return null;
     const focus = kind === "deal" && e.offers[src] && !sus.has(src) ? { s: src, o: e.offers[src] } : best;
-    const st = statsFor(focus.o.price, focus.o);
+    const st = storeStats(focus.s, focus.o.price, e.offers);
     const lab = statsLabel(st);
     const short = STORE_META[src].short;
     let badge;

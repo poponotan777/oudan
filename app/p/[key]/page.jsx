@@ -9,7 +9,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { publicDb, SITE, ensureAffiliate } from "../../../lib/supabaseServer";
 import { loadProduct, loadRelated } from "../../../lib/catalog";
 import { cardsFor } from "../../../lib/cards";
-import { STORE_ORDER, STORE_META, statsFor, statsLabel, yen, fmtTime, productPath } from "../../../lib/priceView";
+import { STORE_ORDER, STORE_META, statsFor, storeStats, statsLabel, yen, fmtTime, productPath } from "../../../lib/priceView";
 import ProductView from "./ProductView";
 
 export const revalidate = 3600;
@@ -53,7 +53,7 @@ export async function generateMetadata({ params }) {
   const p = d.product;
   const sum = priceSummary(d.offers);
   const cheapest = STORE_ORDER.map((s) => d.offers[s] && { s, o: d.offers[s] }).filter(Boolean).sort((a, b) => a.o.price - b.o.price)[0];
-  const lab = cheapest ? statsLabel(statsFor(cheapest.o.price, cheapest.o)) : null;
+  const lab = cheapest ? statsLabel(storeStats(cheapest.s, cheapest.o.price, d.offers)) : null;
   const title = `${p.name.slice(0, 48)}の最安値|楽天・Yahoo!・Amazon比較`;
   const description = `${sum.text}${sum.at ? `(${fmtTime(sum.at)}時点)` : ""}。${cheapest ? `いちばん安いのは${STORE_META[cheapest.s].short}。` : ""}${lab && lab.tone !== "none" ? `${lab.main}・${lab.sub}。` : ""}ポイント込みの実質価格で3サイトを比較。`;
   return {
