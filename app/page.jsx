@@ -28,7 +28,6 @@ import ShareCard from "./components/ShareCard";
 import Feed from "./components/Feed";
 import Reco from "./components/Reco";
 import BuyBox from "./components/BuyBox";
-import PriceChart from "./components/PriceChart";
 import { cardsFor } from "../lib/cards";
 import { SiteHeader, SiteFooter } from "./components/SiteChrome";
 
@@ -185,7 +184,6 @@ function Detail({ product, rates, viewHistory, onOpenRelated }) {
 
       {db && <div className="o-box" style={{ marginTop: 12 }}><BuyBox offers={db.offers} rates={rates} name={product.name} /></div>}
       <PriceCompare name={product.name} offers={product.offers} dbOffers={db?.offers} rates={rates} showTag={!db} />
-      {db && <PriceChart offers={db.offers} />}
       {db && <Reco items={[{ pkey: db.pkey, name: product.name, genre: db.product?.genre }]} />}
 
       {totalReviews > 0 && (

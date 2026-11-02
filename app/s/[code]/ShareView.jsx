@@ -41,7 +41,7 @@ export default function ShareView({ d, code }) {
             </div>
             {it.comment && <p className="o-share-comment">{it.comment}</p>}
             <PriceCompare name={it.name} offers={[]} dbOffers={it.offers} rates={rates} title="" note={false} />
-            <a className="o-link" href={productPath(it.pkey)} style={{ fontSize: 13, display: "inline-block", marginTop: 8 }}>この商品の値段の動きを見る</a>
+            <a className="o-link" href={productPath(it.pkey)} style={{ fontSize: 13, display: "inline-block", marginTop: 8 }}>この商品の3サイト比較を見る</a>
           </article>
         ))}
         <div className="o-box" style={{ marginTop: 20 }}>

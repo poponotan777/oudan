@@ -1,11 +1,10 @@
 "use client";
 // 商品ページの中身(v27)
 //   主役は「商品の画像・いちばん安い値段・どのくらいお得か」。
-//   上から:画像+値段(大きく)→ 3サイト比較 → 値段の動き → 似た商品 → この商品を見た人に
+//   上から:画像+値段(大きく)→ 3サイト比較 → 似た商品 → この商品を見た人に
 //   → どんな商品 → ジャンルの人気 → 紹介する(小さく)→ 最近見た商品
 import { useEffect, useState } from "react";
 import PriceCompare from "../../components/PriceCompare";
-import PriceChart from "../../components/PriceChart";
 import BuyBox from "../../components/BuyBox";
 import ProductCard from "../../components/ProductCard";
 import Heart from "../../components/Heart";
@@ -63,8 +62,6 @@ export default function ProductView({ product, offers, related: rel0 }) {
         <p className="o-note" style={{ marginTop: 4 }}>
           実質価格は「設定」のあなたのポイントで出しています。<a className="o-link" href="/?v=settings">設定を変える</a>
         </p>
-
-        <PriceChart offers={offers} />
 
         <Reco items={[{ pkey: product.pkey, name: product.name, genre: product.genre }]} />
 
