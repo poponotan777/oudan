@@ -16,8 +16,8 @@ import { runKeepa } from "./keepa.js";
 import { buildConcepts } from "./concepts.js";
 
 const MB = 1024 * 1024;
-const WARN_BYTES = Number(process.env.DB_WARN_MB || 400) * MB;   // これを超えたら「有料プランを検討」の通知
-const STOP_BYTES = Number(process.env.DB_STOP_MB || 450) * MB;   // これを超えたら新しい商品を増やさない
+const WARN_BYTES = Number(process.env.DB_WARN_MB || 430) * MB;   // これを超えたら「有料プランを検討」の通知(v38:400→430)
+const STOP_BYTES = Number(process.env.DB_STOP_MB || 380) * MB;   // これを超えたら新しい商品を増やさない(v38:450→380。無料枠で止まらないように)
 
 function summary(md) {
   const f = process.env.GITHUB_STEP_SUMMARY;
@@ -54,7 +54,7 @@ async function main() {
       log(`DB容量 ${(bytes / MB).toFixed(1)}MB / 商品 ${u?.products} / 価格行 ${u?.offers} / 補完待ち ${u?.queue}`);
       if (bytes > STOP_BYTES) {
         noNew = true;
-        log(`容量が ${process.env.DB_STOP_MB || 450}MB を超えているため、新しい商品は追加しません`);
+        log(`容量が ${process.env.DB_STOP_MB || 380}MB を超えているため、新しい商品は追加しません`);
       }
     } else if (/57014|statement timeout|HTTP 5\d\d/.test(String(err))) {
       console.log("::warning::DB容量の確認が混雑で時間切れになりました。新しい商品は増やさず、今ある商品の更新だけ続けます: " + String(err).slice(0, 160));
